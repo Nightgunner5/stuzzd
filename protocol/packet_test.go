@@ -52,3 +52,16 @@ func TestLoginRequest(t *testing.T) {
 		t.Error("LoginRequest packet is not being encoded/decoded properly.")
 	}
 }
+
+func TestKick(t *testing.T) {
+	t.Parallel()
+
+	p1 := Kick{Reason: "This server is currently bacon."}
+	p2 := ReadKick(bytes.NewReader(p1.Packet()[1:]))
+
+	if p1 != p2 {
+		t.Log("Expected: ", p1)
+		t.Log("Actual  : ", p2)
+		t.Error("Kick packet is not being encoded/decoded properly.")
+	}
+}

@@ -71,7 +71,7 @@ func ReadKeepAlive(in io.Reader) KeepAlive {
 }
 
 // http://wiki.vg/Protocol#Login_Request_.280x01.29
-const PROTOCOL_VERSION int32 = 29
+const PROTOCOL_VERSION uint32 = 29
 
 type ServerMode int32
 
@@ -101,7 +101,7 @@ const (
 // Sent by client after the handshake to finish logging in.
 // Sent by server if the client is accepted, otherwise kick is sent.
 type LoginRequest struct {
-	EntityID   int32      // Version on client->server
+	EntityID   uint32     // Version on client->server
 	Username   string     // Not used on server->client
 	LevelType  string     // Not used in client->server, "default" in server->client
 	ServerMode ServerMode // Not used in client->server
@@ -135,5 +135,57 @@ func ReadLoginRequest(in io.Reader) LoginRequest {
 	errorCheck(binary.Read(in, binary.BigEndian, &p.Difficulty))
 	errorCheck(binary.Read(in, binary.BigEndian, &p.Unused))
 	errorCheck(binary.Read(in, binary.BigEndian, &p.MaxPlayers))
+	return p
+}
+
+// Handshake (0x02)
+// client->server, the data is "Username;server:port"
+// server->client, it's a 64 bit unsigned integer in hex form that is used to verify identity
+type Handshake struct {
+	Data string
+}
+
+func (p Handshake) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x02))
+	buf.Write(stringToBytes(p.Data))
+	return buf.Bytes()
+}
+
+func ReadHandshake(in io.Reader) Handshake {
+	var p Handshake
+	p.Data = bytesToString(in)
+	return p
+}
+
+// Server List Ping (0xFE)
+type ServerListPing struct{}
+
+func (p ServerListPing) Packet() []byte {
+	return []byte{0xFE}
+}
+
+func ReadServerListPing(in io.Reader) ServerListPing {
+	var p ServerListPing
+	return p
+}
+
+// Disconnect/Kick (0xFF)
+// If this is recieved by the server, close the connection and drop the client as they have disconnected.
+// If this is sent by the server, drop the client, wait a minute, and close the connection.
+type Kick struct {
+	Reason string // Only read by client when this acts as a kick.
+}
+
+func (p Kick) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0xFF))
+	buf.Write(stringToBytes(p.Reason))
+	return buf.Bytes()
+}
+
+func ReadKick(in io.Reader) Kick {
+	var p Kick
+	p.Reason = bytesToString(in)
 	return p
 }
