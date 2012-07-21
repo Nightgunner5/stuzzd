@@ -1,0 +1,2 @@
+language: go
+script: go test github.com/Nightgunner5/stuzzd/... -v -bench .
