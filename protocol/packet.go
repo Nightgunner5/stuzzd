@@ -158,6 +158,42 @@ func ReadHandshake(in io.Reader) Handshake {
 	return p
 }
 
+// Player Position/Look (0x0D)
+type PlayerPositionLook struct {
+	X      float64
+	Y1     float64
+	Y2     float64
+	Z      float64
+	Yaw    float32
+	Pitch  float32
+	Ground bool
+}
+
+func (p PlayerPositionLook) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x0D))
+	binary.Write(&buf, binary.BigEndian, p.X)
+	binary.Write(&buf, binary.BigEndian, p.Y1)
+	binary.Write(&buf, binary.BigEndian, p.Y2)
+	binary.Write(&buf, binary.BigEndian, p.Z)
+	binary.Write(&buf, binary.BigEndian, p.Yaw)
+	binary.Write(&buf, binary.BigEndian, p.Pitch)
+	binary.Write(&buf, binary.BigEndian, p.Ground)
+	return buf.Bytes()
+}
+
+func ReadPlayerPositionLook(in io.Reader) PlayerPositionLook {
+	var p PlayerPositionLook
+	binary.Read(in, binary.BigEndian, &p.X)
+	binary.Read(in, binary.BigEndian, &p.Y1)
+	binary.Read(in, binary.BigEndian, &p.Y2)
+	binary.Read(in, binary.BigEndian, &p.Z)
+	binary.Read(in, binary.BigEndian, &p.Yaw)
+	binary.Read(in, binary.BigEndian, &p.Pitch)
+	binary.Read(in, binary.BigEndian, &p.Ground)
+	return p
+}
+
 // Server List Ping (0xFE)
 type ServerListPing struct{}
 

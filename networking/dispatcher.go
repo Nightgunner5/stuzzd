@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/Nightgunner5/stuzzd/config"
 	"github.com/Nightgunner5/stuzzd/protocol"
-	"strings"
 	"net/http"
+	"strings"
 )
 
 func dispatchPacket(p Player, packet protocol.Packet) {
@@ -23,6 +23,8 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 		buf := make([]byte, 3)
 		req.Body.Read(buf)
 		if string(buf) == "YES" {
+			p.(*player).authenticated = true
+			OnlinePlayerCount++
 			go p.SendPacket(protocol.LoginRequest{EntityID: p.ID(), LevelType: "default", ServerMode: protocol.Survival, Dimension: protocol.Overworld, Difficulty: protocol.Peaceful, MaxPlayers: config.NumSlots()})
 		} else {
 			go p.SendPacket(protocol.Kick{Reason: "Failed to verify username!"})
@@ -31,6 +33,8 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 		data := strings.Split(pkt.Data, ";")
 		p.setUsername(data[0])
 		go p.SendPacket(protocol.Handshake{fmt.Sprintf("%016x", p.getLoginToken())})
+	case protocol.PlayerPositionLook:
+		// TODO
 	case protocol.ServerListPing:
 		go p.SendPacket(protocol.Kick{Reason: fmt.Sprintf("%s§%d§%d", config.ServerDescription(), OnlinePlayerCount, config.NumSlots())})
 	default:

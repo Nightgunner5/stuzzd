@@ -30,3 +30,7 @@ var entities = make(map[uint32]Entity)
 func RegisterEntity(ent Entity) {
 	entities[ent.ID()] = ent
 }
+
+func RemoveEntity(ent Entity) {
+	delete(entities, ent.ID())
+}

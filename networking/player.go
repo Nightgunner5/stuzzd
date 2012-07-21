@@ -18,16 +18,20 @@ func HandlePlayer(conn net.Conn) Player {
 	p.id = assignID()
 	p.sendq = make(chan protocol.Packet)
 	go func() {
-		kicked, countedAsPlayer := false, false
 		defer func() {
 			err := recover()
-			if err != nil && !kicked {
-				safeSendPacket(conn, protocol.Kick{fmt.Sprint("Error: ", err)})
+			if err != nil {
+				if pkt, ok := err.(protocol.Kick); ok {
+					safeSendPacket(conn, pkt)
+				} else {
+					safeSendPacket(conn, protocol.Kick{fmt.Sprint("Error: ", err)})
+				}
 			}
-			if countedAsPlayer {
+			RemoveEntity(p)
+			if p.authenticated {
 				OnlinePlayerCount--
 			}
-			time.Sleep(10 * time.Second)
+			time.Sleep(1 * time.Second)
 			conn.Close()
 		}()
 		recvq := make(chan protocol.Packet)
@@ -38,14 +42,10 @@ func HandlePlayer(conn net.Conn) Player {
 			select {
 			case packet := <-p.sendq:
 				if _, ok := packet.(protocol.Kick); ok {
-					kicked = true
+					panic(packet)
 				}
 				sendPacket(conn, packet)
 			case packet := <-recvq:
-				if _, ok := packet.(protocol.LoginRequest); ok && !countedAsPlayer {
-					countedAsPlayer = true
-					OnlinePlayerCount++
-				}
 				if ka, ok := packet.(protocol.KeepAlive); ok && ka.ID == 0 {
 					timeoutKeepAlive = time.After(time.Second * 60)
 				}
@@ -64,7 +64,7 @@ func recv(p Player, in io.Reader, recvq chan<- protocol.Packet) {
 	defer func() {
 		err := recover()
 		if err != nil {
-			p.SendPacket(protocol.Kick{fmt.Sprint("Network error: ", err)})
+			p.SendPacket(protocol.Kick{fmt.Sprint("Error: ", err)})
 		}
 	}()
 	id := make([]byte, 1)
@@ -77,12 +77,14 @@ func recv(p Player, in io.Reader, recvq chan<- protocol.Packet) {
 			recvq <- protocol.ReadLoginRequest(in)
 		case 0x02:
 			recvq <- protocol.ReadHandshake(in)
+		case 0x0D:
+			recvq <- protocol.ReadPlayerPositionLook(in)
 		case 0xFE:
 			recvq <- protocol.ReadServerListPing(in)
 		case 0xFF:
 			recvq <- protocol.ReadKick(in)
 		default:
-			panic(fmt.Sprint("Unknown packet ID: ", id[0]))
+			panic(fmt.Sprint("Unknown packet ID dropped: ", id[0]))
 		}
 	}
 }
@@ -103,9 +105,10 @@ type Player interface {
 
 type player struct {
 	entity
-	username   string
-	logintoken uint64
-	sendq      chan protocol.Packet
+	username      string
+	logintoken    uint64
+	authenticated bool
+	sendq         chan protocol.Packet
 }
 
 func (p *player) setUsername(username string) {
