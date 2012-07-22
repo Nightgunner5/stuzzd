@@ -415,6 +415,23 @@ func (p EntityRelativeMove) Packet() []byte {
 
 // No read function as this is not sent by the client.
 
+// Entity Look (0x20)
+type EntityLook struct {
+	ID         uint32
+	Yaw, Pitch float32
+}
+
+func (p EntityLook) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x20))
+	binary.Write(&buf, binary.BigEndian, p.ID)
+	encodeAngle(p.Yaw, &buf)
+	encodeAngle(p.Pitch, &buf)
+	return buf.Bytes()
+}
+
+// No read function as this is not sent by the client.
+
 // Entity Teleport (0x22)
 type EntityTeleport struct {
 	ID         uint32
@@ -431,6 +448,22 @@ func (p EntityTeleport) Packet() []byte {
 	encodeDouble(p.Z, &buf)
 	encodeAngle(p.Yaw, &buf)
 	encodeAngle(p.Pitch, &buf)
+	return buf.Bytes()
+}
+
+// No read function as this is not sent by the client.
+
+// Entity Head Look (0x23)
+type EntityHeadLook struct {
+	ID  uint32
+	Yaw float32
+}
+
+func (p EntityHeadLook) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x23))
+	binary.Write(&buf, binary.BigEndian, p.ID)
+	encodeAngle(p.Yaw, &buf)
 	return buf.Bytes()
 }
 

@@ -134,6 +134,10 @@ func recv(p Player, in io.Reader, recvq chan<- protocol.Packet) {
 			recvq <- protocol.ReadPlayerLook(in)
 		case 0x0D:
 			recvq <- protocol.ReadPlayerPositionLook(in)
+		case 0x10:
+			in.Read(make([]byte, 2)) // TODO
+		case 0x12:
+			in.Read(make([]byte, 5)) // TODO
 		case 0x13:
 			in.Read(make([]byte, 5)) // TODO
 		case 0x47: // When the server sends this, it's a lightning bolt. When the client sends it, it means they're doing a HTTP GET. Switch over to the HTTP handler.
@@ -164,9 +168,13 @@ type Player interface {
 
 	Position() (x, y, z float64)
 	SetPosition(x, y, z float64)
-
 	// Sets the position and sends the offset to all online players.
 	SendPosition(x, y, z float64)
+
+	Angles() (yaw, pitch float32)
+	SetAngles(yaw, pitch float32)
+	// Sets the angles and sends them to all online players.
+	SendAngles(yaw, pitch float32)
 
 	makeSpawnPacket() protocol.SpawnNamedEntity
 	sendSpawnPacket()
@@ -259,6 +267,20 @@ func (p *player) SetPosition(x, y, z float64) {
 
 func (p *player) Position() (x, y, z float64) {
 	return p.x, p.y, p.z
+}
+
+func (p *player) SendAngles(yaw, pitch float32) {
+	p.yaw, p.pitch = yaw, pitch
+	SendToAllExcept(p, protocol.EntityLook{ID: p.id, Yaw: yaw, Pitch: pitch})
+	SendToAllExcept(p, protocol.EntityHeadLook{ID: p.id, Yaw: yaw})
+}
+
+func (p *player) SetAngles(yaw, pitch float32) {
+	p.yaw, p.pitch = yaw, pitch
+}
+
+func (p *player) Angles() (yaw, pitch float32) {
+	return p.yaw, p.pitch
 }
 
 func (p *player) makeSpawnPacket() protocol.SpawnNamedEntity {

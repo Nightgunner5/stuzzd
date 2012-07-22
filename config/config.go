@@ -6,5 +6,5 @@ func ServerDescription() string {
 }
 
 func NumSlots() uint8 {
-	return 20
+	return 255 // I'm crazy.
 }

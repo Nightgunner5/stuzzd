@@ -2,8 +2,8 @@ package networking
 
 import (
 	"github.com/Nightgunner5/stuzzd/protocol"
-	"sync"
 	"math"
+	"sync"
 )
 
 func deg(in float32) float32 {

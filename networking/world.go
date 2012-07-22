@@ -1,6 +1,8 @@
 package networking
 
-import "github.com/Nightgunner5/stuzzd/protocol"
+import (
+	"github.com/Nightgunner5/stuzzd/protocol"
+)
 
 var debugChunk protocol.Chunk
 
@@ -14,7 +16,8 @@ func init() {
 			for y := uint8(40); y < 63; y++ {
 				debugChunk.SetBlock(x, y, z, protocol.Dirt)
 			}
-			debugChunk.SetBlock(x, 63, z, protocol.Grass)
+			debugChunk.SetBlock(x, 63, z, protocol.Wool)
+			debugChunk.SetBlockData(x, 63, z, 2)
 			for y := uint16(63); y < 256; y++ {
 				debugChunk.LightSky.Set(x, uint8(y), z, 15)
 			}
@@ -23,7 +26,7 @@ func init() {
 }
 
 func GetBlockAt(x, y, z int32) protocol.BlockType {
-	return GetChunk(x >> 4, z >> 4).GetBlock(uint8(x & 0xF), uint8(y), uint8(z & 0xF))
+	return GetChunk(x>>4, z>>4).GetBlock(uint8(x&0xF), uint8(y), uint8(z&0xF))
 }
 
 func GetChunk(x, z int32) *protocol.Chunk {
