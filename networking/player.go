@@ -26,8 +26,6 @@ func HandlePlayer(conn net.Conn) Player {
 				} else {
 					safeSendPacket(conn, protocol.Kick{fmt.Sprint("Error: ", err)})
 				}
-			} else {
-				log.Print("!!! Exited without an error: ", conn.RemoteAddr(), p.Username())
 			}
 			RemoveEntity(p)
 			if p.authenticated {
@@ -48,6 +46,10 @@ func HandlePlayer(conn net.Conn) Player {
 				}
 				sendPacket(conn, packet)
 			case packet := <-recvq:
+				if _, ok := packet.(SwitchToHttp); ok {
+					sendHTTPResponse(conn)
+					return
+				}
 				if ka, ok := packet.(protocol.KeepAlive); ok && ka.ID == 0 {
 					timeoutKeepAlive = time.After(time.Second * 60)
 				}
@@ -60,6 +62,46 @@ func HandlePlayer(conn net.Conn) Player {
 		}
 	}()
 	return p
+}
+
+func sendHTTPResponse(conn net.Conn) {
+	io.WriteString(conn, `HTTP/1.0 200 OK
+Content-Type: text/html; charset=UTF-8
+Server: StuzzD
+Connection: close
+`)
+	page := `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>StuzzD Server Status</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="http://www.stuzzhosting.com/css/style.css" rel="stylesheet">
+
+<!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+<!--[if lt IE 9]>
+<script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+<![endif]-->
+</head>
+<body>
+<div class="container"><div class="row"><div class="span4"><img src="http://www.stuzzhosting.com/img/logo.png"></div></div></div>
+<div class="hero-unit"><div class="container"><div class="row"><div class="span7">
+<h1>StuzzD Server Status</h1>
+<p>Thank you for connecting to a Minecraft server over HTTP. You now know a secret way to figure out if a StuzzHosting Minecraft server is up.</p>
+</div></div></div></div>
+<footer><div class="copyrights"><div class="container"><p>Copyright &copy; <a href="http://www.stuzzhosting.com" rel="tooltip" title="StuzzHosting is Best Hosting">StuzzHosting.com</a> 2012</p><p>Also, why the hell would you connect to a Minecraft server over HTTP?</p></div></div></footer>
+<script src="http://www.stuzzhosting.com/js/jquery.js"></script>
+<script src="http://www.stuzzhosting.com/js/bootstrap.js"></script>
+</body>
+</html>`
+	fmt.Fprintf(conn, "Content-Length: %d\n\n%s", len(page), page)
+}
+
+type SwitchToHttp struct {
+}
+
+func (SwitchToHttp) Packet() []byte {
+	panic("Connected over HTTP")
 }
 
 func recv(p Player, in io.Reader, recvq chan<- protocol.Packet) {
@@ -87,6 +129,8 @@ func recv(p Player, in io.Reader, recvq chan<- protocol.Packet) {
 			recvq <- protocol.ReadPlayerLook(in)
 		case 0x0D:
 			recvq <- protocol.ReadPlayerPositionLook(in)
+		case 0x47: // When the server sends this, it's a lightning bolt. When the client sends it, it means they're doing a HTTP GET. Switch over to the HTTP handler.
+			recvq <- SwitchToHttp{}
 		case 0xFE:
 			recvq <- protocol.ReadServerListPing(in)
 		case 0xFF:
