@@ -178,7 +178,11 @@ func (p PlayerPositionLook) Packet() []byte {
 	binary.Write(&buf, binary.BigEndian, p.Z)
 	binary.Write(&buf, binary.BigEndian, p.Yaw)
 	binary.Write(&buf, binary.BigEndian, p.Pitch)
-	binary.Write(&buf, binary.BigEndian, p.Ground)
+	var ground uint8
+	if p.Ground {
+		ground = 1
+	}
+	binary.Write(&buf, binary.BigEndian, ground)
 	return buf.Bytes()
 }
 
@@ -190,7 +194,11 @@ func ReadPlayerPositionLook(in io.Reader) PlayerPositionLook {
 	binary.Read(in, binary.BigEndian, &p.Z)
 	binary.Read(in, binary.BigEndian, &p.Yaw)
 	binary.Read(in, binary.BigEndian, &p.Pitch)
-	binary.Read(in, binary.BigEndian, &p.Ground)
+	var ground uint8
+	binary.Read(in, binary.BigEndian, &ground)
+	if ground == 1 {
+		p.Ground = true
+	}
 	return p
 }
 
