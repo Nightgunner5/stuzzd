@@ -158,6 +158,97 @@ func ReadHandshake(in io.Reader) Handshake {
 	return p
 }
 
+// Flying (0x0A)
+type Flying struct {
+	Ground bool
+}
+
+func (p Flying) Packet() []byte {
+	var ground byte
+	if p.Ground {
+		ground = 1
+	}
+	return []byte{0x0A, ground}
+}
+
+func ReadFlying(in io.Reader) Flying {
+	var ground uint8
+	binary.Read(in, binary.BigEndian, &ground)
+	if ground == 1 {
+		return Flying{Ground: true}
+	}
+	return Flying{Ground: false}
+}
+
+// Player Position (0x0B)
+type PlayerPosition struct {
+	X      float64
+	Y1     float64
+	Y2     float64
+	Z      float64
+	Ground bool
+}
+
+func (p PlayerPosition) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, p.X)
+	binary.Write(&buf, binary.BigEndian, p.Y1)
+	binary.Write(&buf, binary.BigEndian, p.Y2)
+	binary.Write(&buf, binary.BigEndian, p.Z)
+	var ground uint8
+	if p.Ground {
+		ground = 1
+	}
+	binary.Write(&buf, binary.BigEndian, ground)
+	return buf.Bytes()
+}
+
+func ReadPlayerPosition(in io.Reader) PlayerPosition {
+	var p PlayerPosition
+	binary.Read(in, binary.BigEndian, &p.X)
+	binary.Read(in, binary.BigEndian, &p.Y1)
+	binary.Read(in, binary.BigEndian, &p.Y2)
+	binary.Read(in, binary.BigEndian, &p.Z)
+	var ground uint8
+	binary.Read(in, binary.BigEndian, &ground)
+	if ground == 1 {
+		p.Ground = true
+	}
+	return p
+}
+
+// Player Look (0x0C)
+type PlayerLook struct {
+	Yaw    float32
+	Pitch  float32
+	Ground bool
+}
+
+func (p PlayerLook) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x0C))
+	binary.Write(&buf, binary.BigEndian, p.Yaw)
+	binary.Write(&buf, binary.BigEndian, p.Pitch)
+	var ground uint8
+	if p.Ground {
+		ground = 1
+	}
+	binary.Write(&buf, binary.BigEndian, ground)
+	return buf.Bytes()
+}
+
+func ReadPlayerLook(in io.Reader) PlayerLook {
+	var p PlayerLook
+	binary.Read(in, binary.BigEndian, &p.Yaw)
+	binary.Read(in, binary.BigEndian, &p.Pitch)
+	var ground uint8
+	binary.Read(in, binary.BigEndian, &ground)
+	if ground == 1 {
+		p.Ground = true
+	}
+	return p
+}
+
 // Player Position/Look (0x0D)
 type PlayerPositionLook struct {
 	X      float64

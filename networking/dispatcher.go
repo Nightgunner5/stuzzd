@@ -33,6 +33,12 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 		data := strings.Split(pkt.Data, ";")
 		p.setUsername(data[0])
 		go p.SendPacket(protocol.Handshake{fmt.Sprintf("%016x", p.getLoginToken())})
+	case protocol.Flying:
+		// TODO
+	case protocol.PlayerPosition:
+		// TODO
+	case protocol.PlayerLook:
+		// TODO
 	case protocol.PlayerPositionLook:
 		// TODO
 	case protocol.ServerListPing:

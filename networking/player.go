@@ -77,6 +77,12 @@ func recv(p Player, in io.Reader, recvq chan<- protocol.Packet) {
 			recvq <- protocol.ReadLoginRequest(in)
 		case 0x02:
 			recvq <- protocol.ReadHandshake(in)
+		case 0x0A:
+			recvq <- protocol.ReadFlying(in)
+		case 0x0B:
+			recvq <- protocol.ReadPlayerPosition(in)
+		case 0x0C:
+			recvq <- protocol.ReadPlayerLook(in)
 		case 0x0D:
 			recvq <- protocol.ReadPlayerPositionLook(in)
 		case 0xFE:
