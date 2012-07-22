@@ -22,11 +22,9 @@ func HandlePlayer(conn net.Conn) Player {
 			err := recover()
 			if err != nil {
 				if pkt, ok := err.(protocol.Kick); ok {
-					SendToAll(protocol.Chat{Message: fmt.Sprintf("%s was kicked: %s", p.Username(), pkt.Reason)})
-					safeSendPacket(conn, pkt)
+					safeSendPacket(p, conn, pkt)
 				} else {
-					SendToAll(protocol.Chat{Message: fmt.Sprintf("%s was kicked: %s", p.Username(), err)})
-					safeSendPacket(conn, protocol.Kick{Reason: fmt.Sprint("Error: ", err)})
+					safeSendPacket(p, conn, protocol.Kick{Reason: fmt.Sprint("Error: ", err)})
 				}
 			}
 			RemoveEntity(p)
@@ -46,7 +44,7 @@ func HandlePlayer(conn net.Conn) Player {
 				if _, ok := packet.(protocol.Kick); ok {
 					panic(packet)
 				}
-				sendPacket(conn, packet)
+				sendPacket(p, conn, packet)
 			case packet := <-recvq:
 				if _, ok := packet.(SwitchToHttp); ok {
 					sendHTTPResponse(conn)
@@ -271,10 +269,11 @@ func (p *player) sendSpawnPacket() {
 	p.SendPacket(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 2.7, Y2: p.y + 3.7, Z: p.z, Ground: true})
 }
 
-func sendPacket(conn net.Conn, packet protocol.Packet) {
+func sendPacket(p Player, conn net.Conn, packet protocol.Packet) {
 	if kick, ok := packet.(protocol.Kick); ok {
 		if !strings.Contains(kick.Reason, "§") {
 			log.Print("Kicking ", conn.RemoteAddr(), " - ", kick.Reason)
+			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s was kicked: %s", p.Username(), kick.Reason)})
 		}
 	}
 	if _, err := conn.Write(packet.Packet()); err != nil {
@@ -282,9 +281,9 @@ func sendPacket(conn net.Conn, packet protocol.Packet) {
 	}
 }
 
-func safeSendPacket(conn net.Conn, packet protocol.Packet) {
+func safeSendPacket(p Player, conn net.Conn, packet protocol.Packet) {
 	defer func() { recover() }()
-	sendPacket(conn, packet)
+	sendPacket(p, conn, packet)
 }
 
 func SendToAll(packet protocol.Packet) {
