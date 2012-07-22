@@ -26,6 +26,8 @@ func HandlePlayer(conn net.Conn) Player {
 				} else {
 					safeSendPacket(conn, protocol.Kick{fmt.Sprint("Error: ", err)})
 				}
+			} else {
+				log.Print("!!! Exited without an error: ", conn.RemoteAddr(), p.Username())
 			}
 			RemoveEntity(p)
 			if p.authenticated {
@@ -36,7 +38,7 @@ func HandlePlayer(conn net.Conn) Player {
 		}()
 		recvq := make(chan protocol.Packet)
 		go recv(p, conn, recvq)
-		sendKeepAlive := time.After(time.Second * 50)    // 1000 ticks
+		sendKeepAlive := time.Tick(time.Second * 50)     // 1000 ticks
 		timeoutKeepAlive := time.After(time.Second * 60) // 1200 ticks
 		for {
 			select {
@@ -131,7 +133,9 @@ func (p *player) getLoginToken() uint64 {
 }
 
 func (p *player) SendPacket(packet protocol.Packet) {
-	p.sendq <- packet
+	go func() {
+		p.sendq <- packet
+	}()
 }
 
 func sendPacket(conn net.Conn, packet protocol.Packet) {
