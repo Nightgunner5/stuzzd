@@ -22,9 +22,11 @@ func HandlePlayer(conn net.Conn) Player {
 			err := recover()
 			if err != nil {
 				if pkt, ok := err.(protocol.Kick); ok {
+					SendToAll(protocol.Chat{Message: fmt.Sprintf("%s was kicked: %s", p.Username(), pkt.Reason)})
 					safeSendPacket(conn, pkt)
 				} else {
-					safeSendPacket(conn, protocol.Kick{fmt.Sprint("Error: ", err)})
+					SendToAll(protocol.Chat{Message: fmt.Sprintf("%s was kicked: %s", p.Username(), err)})
+					safeSendPacket(conn, protocol.Kick{Reason: fmt.Sprint("Error: ", err)})
 				}
 			}
 			RemoveEntity(p)
@@ -36,8 +38,8 @@ func HandlePlayer(conn net.Conn) Player {
 		}()
 		recvq := make(chan protocol.Packet)
 		go recv(p, conn, recvq)
-		sendKeepAlive := time.Tick(time.Second * 50)     // 1000 ticks
-		timeoutKeepAlive := time.After(time.Second * 60) // 1200 ticks
+		sendKeepAlive := time.Tick(time.Second * 50) // 1000 ticks
+		//timeoutKeepAlive := time.After(time.Second * 60) // 1200 ticks
 		for {
 			select {
 			case packet := <-p.sendq:
@@ -50,14 +52,17 @@ func HandlePlayer(conn net.Conn) Player {
 					sendHTTPResponse(conn)
 					return
 				}
-				if ka, ok := packet.(protocol.KeepAlive); ok && ka.ID == 0 {
-					timeoutKeepAlive = time.After(time.Second * 60)
-				}
+				//if ka, ok := packet.(protocol.KeepAlive); ok && ka.ID == 0 {
+				//	timeoutKeepAlive = time.After(time.Second * 60)
+				//}
 				dispatchPacket(p, packet)
+				if _, ok := packet.(protocol.Kick); ok {
+					return
+				}
 			case <-sendKeepAlive:
 				p.SendPacket(protocol.KeepAlive{7031})
-			case <-timeoutKeepAlive:
-				panic("Connection timed out")
+				//case <-timeoutKeepAlive:
+				//	panic("Connection timed out")
 			}
 		}
 	}()
@@ -121,6 +126,8 @@ func recv(p Player, in io.Reader, recvq chan<- protocol.Packet) {
 			recvq <- protocol.ReadLoginRequest(in)
 		case 0x02:
 			recvq <- protocol.ReadHandshake(in)
+		case 0x03:
+			recvq <- protocol.ReadChat(in)
 		case 0x0A:
 			recvq <- protocol.ReadFlying(in)
 		case 0x0B:
@@ -129,8 +136,12 @@ func recv(p Player, in io.Reader, recvq chan<- protocol.Packet) {
 			recvq <- protocol.ReadPlayerLook(in)
 		case 0x0D:
 			recvq <- protocol.ReadPlayerPositionLook(in)
+		case 0x13:
+			in.Read(make([]byte, 5)) // TODO
 		case 0x47: // When the server sends this, it's a lightning bolt. When the client sends it, it means they're doing a HTTP GET. Switch over to the HTTP handler.
 			recvq <- SwitchToHttp{}
+		case 0xCA:
+			recvq <- protocol.ReadPlayerAbilities(in)
 		case 0xFE:
 			recvq <- protocol.ReadServerListPing(in)
 		case 0xFF:
@@ -151,6 +162,16 @@ type Player interface {
 
 	Username() string
 
+	Authenticated() bool
+
+	Position() (x, y, z float64)
+	SetPosition(x, y, z float64)
+
+	// Sets the position and sends the offset to all online players.
+	SendPosition(x, y, z float64)
+
+	makeSpawnPacket() protocol.SpawnNamedEntity
+	sendSpawnPacket()
 	setUsername(string)
 	getLoginToken() uint64
 }
@@ -161,6 +182,9 @@ type player struct {
 	logintoken    uint64
 	authenticated bool
 	sendq         chan protocol.Packet
+	x, y, z       float64
+	pitch, yaw    float32 // radians, not degrees (!)
+	movecounter   uint8
 }
 
 func (p *player) setUsername(username string) {
@@ -182,6 +206,71 @@ func (p *player) SendPacket(packet protocol.Packet) {
 	}()
 }
 
+func (p *player) Authenticated() bool {
+	return p.authenticated
+}
+
+func (p *player) SendPosition(x, y, z float64) {
+	defer func() {
+		if recover() != nil {
+			SendToAll(protocol.EntityTeleport{
+				ID:    p.id,
+				X:     p.x,
+				Y:     p.y,
+				Z:     p.z,
+				Yaw:   p.yaw,
+				Pitch: p.pitch,
+			})
+			p.SendPacket(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 1, Y2: p.y, Z: p.z, Yaw: deg(p.yaw), Pitch: deg(p.pitch)})
+		}
+	}()
+	// TEMPORARY
+	if y < 63.5 {
+		if p.y < 64 {
+			p.y = 64
+		}
+		panic("TEMPORARY")
+	}
+
+	p.movecounter++
+	if p.movecounter < 10 {
+		SendToAllExcept(p, protocol.EntityRelativeMove{
+			ID: p.id,
+			X:  protocol.CheckedFloatToByte(x - p.x),
+			Y:  protocol.CheckedFloatToByte(y - p.y),
+			Z:  protocol.CheckedFloatToByte(z - p.z),
+		})
+	}
+
+	p.x, p.y, p.z = x, y, z
+
+	if p.movecounter >= 10 {
+		SendToAllExcept(p, protocol.EntityTeleport{
+			ID: p.id,
+			X:  p.x,
+			Y:  p.y, Z: p.z,
+			Yaw: p.yaw, Pitch: p.pitch,
+		})
+		p.movecounter = 0
+	}
+}
+
+func (p *player) SetPosition(x, y, z float64) {
+	p.x, p.y, p.z = x, y, z
+}
+
+func (p *player) Position() (x, y, z float64) {
+	return p.x, p.y, p.z
+}
+
+func (p *player) makeSpawnPacket() protocol.SpawnNamedEntity {
+	return protocol.SpawnNamedEntity{EID: p.id, Name: p.username, X: p.x, Y: p.y, Z: p.z}
+}
+
+func (p *player) sendSpawnPacket() {
+	p.SendPacket(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 2.7, Y2: p.y + 3.7, Z: p.z, Ground: true})
+}
+
 func sendPacket(conn net.Conn, packet protocol.Packet) {
 	if kick, ok := packet.(protocol.Kick); ok {
 		if !strings.Contains(kick.Reason, "§") {
@@ -196,4 +285,23 @@ func sendPacket(conn net.Conn, packet protocol.Packet) {
 func safeSendPacket(conn net.Conn, packet protocol.Packet) {
 	defer func() { recover() }()
 	sendPacket(conn, packet)
+}
+
+func SendToAll(packet protocol.Packet) {
+	for _, player := range players {
+		if player.Authenticated() {
+			player.SendPacket(packet)
+		}
+	}
+}
+
+func SendToAllExcept(exclude Player, packet protocol.Packet) {
+	for _, player := range players {
+		if player.ID() == exclude.ID() {
+			continue
+		}
+		if player.Authenticated() {
+			player.SendPacket(packet)
+		}
+	}
 }

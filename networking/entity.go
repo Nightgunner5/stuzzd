@@ -1,6 +1,18 @@
 package networking
 
-import "sync"
+import (
+	"github.com/Nightgunner5/stuzzd/protocol"
+	"sync"
+	"math"
+)
+
+func deg(in float32) float32 {
+	return in / math.Pi * 180
+}
+
+func rad(in float32) float32 {
+	return in * math.Pi / 180
+}
 
 type Entity interface {
 	ID() uint32
@@ -26,11 +38,19 @@ func (e *entity) ID() uint32 {
 }
 
 var entities = make(map[uint32]Entity)
+var players = make(map[uint32]Player)
 
 func RegisterEntity(ent Entity) {
 	entities[ent.ID()] = ent
+	if p, ok := ent.(Player); ok {
+		players[ent.ID()] = p
+	}
 }
 
 func RemoveEntity(ent Entity) {
 	delete(entities, ent.ID())
+	if _, ok := ent.(Player); ok {
+		delete(players, ent.ID())
+	}
+	SendToAll(protocol.DestroyEntity{ID: ent.ID()})
 }

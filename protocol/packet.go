@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
+	"strings"
 )
 
 // Functions in this file panic instead of returning errors. This allows us to jump straight to the networking goroutine
@@ -49,6 +51,33 @@ func bytesToString(in io.Reader) string {
 		out = append(out, rune(r))
 	}
 	return string(out)
+}
+
+func CheckedFloatToByte(in float64) int8 {
+	if in > 4 || in < -4 {
+		panic("Out of range float")
+	}
+	if in*32 >= 127 {
+		return 127
+	}
+	if in*32 <= -128 {
+		return -128
+	}
+	return int8(in * 32)
+}
+
+func encodeDouble(d float64, out io.Writer) {
+	binary.Write(out, binary.BigEndian, int32(d*32))
+}
+
+func decodeDouble(in io.Reader) float64 {
+	var d int32
+	binary.Read(in, binary.BigEndian, &d)
+	return float64(d) / 32
+}
+
+func encodeAngle(a float32, out io.Writer) {
+	out.Write([]byte{uint8(a / math.Pi * 128)})
 }
 
 // Keep Alive (0x00)
@@ -157,6 +186,43 @@ func ReadHandshake(in io.Reader) Handshake {
 	p.Data = bytesToString(in)
 	return p
 }
+
+// Chat (0x03)
+type Chat struct {
+	Message string
+}
+
+func (p Chat) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x03))
+	buf.Write(stringToBytes(p.Message))
+	return buf.Bytes()
+}
+
+func ReadChat(in io.Reader) Chat {
+	var p Chat
+	p.Message = bytesToString(in)
+	for _, r := range []rune(p.Message) {
+		if !strings.ContainsRune(" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_'abcdefghijklmnopqrstuvwxyz{|}~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜø£Ø×ƒáíóúñÑªº¿®¬½¼¡«»", r) {
+			panic("Illegal character in string")
+		}
+	}
+	return p
+}
+
+// Time Update (0x04)
+type TimeUpdate struct {
+	Time uint64
+}
+
+func (p TimeUpdate) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x04))
+	binary.Write(&buf, binary.BigEndian, p.Time)
+	return buf.Bytes()
+}
+
+// No read function as this is not sent by the client.
 
 // Flying (0x0A)
 type Flying struct {
@@ -289,6 +355,177 @@ func ReadPlayerPositionLook(in io.Reader) PlayerPositionLook {
 	binary.Read(in, binary.BigEndian, &ground)
 	if ground == 1 {
 		p.Ground = true
+	}
+	return p
+}
+
+// Spawn Named Entity (0x14)
+type SpawnNamedEntity struct {
+	EID        uint32
+	Name       string
+	X, Y, Z    float64
+	Yaw, Pitch int8 // TODO
+	ItemInHand uint16
+}
+
+func (p SpawnNamedEntity) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x14))
+	binary.Write(&buf, binary.BigEndian, p.EID)
+	buf.Write(stringToBytes(p.Name))
+	encodeDouble(p.X, &buf)
+	encodeDouble(p.Y, &buf)
+	encodeDouble(p.Z, &buf)
+	buf.Write([]byte{0, 0})
+	binary.Write(&buf, binary.BigEndian, p.ItemInHand)
+	return buf.Bytes()
+}
+
+// No read function as this is not sent by the client.
+
+// Destroy Entity (0x1D)
+type DestroyEntity struct {
+	ID uint32
+}
+
+func (p DestroyEntity) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x1D))
+	binary.Write(&buf, binary.BigEndian, p.ID)
+	return buf.Bytes()
+}
+
+// No read function as this is not sent by the client.
+
+// Entity Relative Move (0x1F)
+type EntityRelativeMove struct {
+	ID      uint32
+	X, Y, Z int8 // Encoded at creation time, not write time, to prevent incorrect kicks.
+}
+
+func (p EntityRelativeMove) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x1F))
+	binary.Write(&buf, binary.BigEndian, p.ID)
+	binary.Write(&buf, binary.BigEndian, p.X)
+	binary.Write(&buf, binary.BigEndian, p.Y)
+	binary.Write(&buf, binary.BigEndian, p.Z)
+	return buf.Bytes()
+}
+
+// No read function as this is not sent by the client.
+
+// Entity Teleport (0x22)
+type EntityTeleport struct {
+	ID         uint32
+	X, Y, Z    float64
+	Yaw, Pitch float32
+}
+
+func (p EntityTeleport) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x22))
+	binary.Write(&buf, binary.BigEndian, p.ID)
+	encodeDouble(p.X, &buf)
+	encodeDouble(p.Y, &buf)
+	encodeDouble(p.Z, &buf)
+	encodeAngle(p.Yaw, &buf)
+	encodeAngle(p.Pitch, &buf)
+	return buf.Bytes()
+}
+
+// No read function as this is not sent by the client.
+
+// Chunk Allocation (0x32)
+type ChunkAllocation struct {
+	X, Z int32
+	Init bool
+}
+
+func (p ChunkAllocation) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x32))
+	binary.Write(&buf, binary.BigEndian, p.X)
+	binary.Write(&buf, binary.BigEndian, p.Z)
+	var init uint8
+	if p.Init {
+		init = 1
+	}
+	binary.Write(&buf, binary.BigEndian, init)
+	return buf.Bytes()
+}
+
+// No read function as this is not sent by the client.
+
+// Chunk Data (0x33)
+type ChunkData struct {
+	X     int32
+	Z     int32
+	Chunk *Chunk
+}
+
+func (p ChunkData) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x33))
+	binary.Write(&buf, binary.BigEndian, p.X)
+	binary.Write(&buf, binary.BigEndian, p.Z)
+	binary.Write(&buf, binary.BigEndian, uint8(1))
+	binary.Write(&buf, binary.BigEndian, ^uint16(0))
+	binary.Write(&buf, binary.BigEndian, uint16(0))
+
+	payload := p.Chunk.Compressed()
+
+	binary.Write(&buf, binary.BigEndian, int32(len(payload)))
+	binary.Write(&buf, binary.BigEndian, int32(0))
+	buf.Write(payload)
+	return buf.Bytes()
+}
+
+// No read function as this is not sent by the client.
+
+// Player Abilities (0xCA)
+type PlayerAbilities struct {
+	Invulnerable   bool
+	Flying         bool
+	CanFly         bool
+	InstantDestroy bool
+}
+
+func (p PlayerAbilities) Packet() []byte {
+	var invulnerable, flying, canfly, instantdestroy uint8
+	if p.Invulnerable {
+		invulnerable = 1
+	}
+	if p.Flying {
+		flying = 1
+	}
+	if p.CanFly {
+		canfly = 1
+	}
+	if p.InstantDestroy {
+		instantdestroy = 1
+	}
+
+	return []byte{0xCA, invulnerable, flying, canfly, instantdestroy}
+}
+
+func ReadPlayerAbilities(in io.Reader) PlayerAbilities {
+	var p PlayerAbilities
+
+	b := make([]byte, 4)
+	in.Read(b)
+
+	if b[0] == 1 {
+		p.Invulnerable = true
+	}
+	if b[1] == 1 {
+		p.Flying = true
+	}
+	if b[2] == 1 {
+		p.CanFly = true
+	}
+	if b[3] == 1 {
+		p.InstantDestroy = true
 	}
 	return p
 }
