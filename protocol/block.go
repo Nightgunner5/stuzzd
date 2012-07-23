@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"bytes"
+	"encoding/binary"
 	"compress/zlib"
 	"sync"
 )
@@ -235,7 +236,7 @@ type Chunk struct {
 	Biomes      [16][16]Biome
 	dirty       bool
 	compressed  []byte
-	compressing sync.Mutex
+	compressing sync.RWMutex
 }
 
 func (c *Chunk) SetBlock(x, y, z uint8, block BlockType) {
@@ -257,38 +258,40 @@ func (c *Chunk) GetBlockData(x, y, z uint8) uint8 {
 }
 
 func (c *Chunk) Compressed() []byte {
-	if c.dirty || c.compressed == nil {
-		c.compressing.Lock()
-		defer c.compressing.Unlock()
-		if !c.dirty && c.compressed != nil {
-			return c.compressed
-		}
-		var buf bytes.Buffer
-		w := zlib.NewWriter(&buf)
-
-		for _, blocks := range c.Blocks {
-			for _, block := range blocks {
-				w.Write([]byte{byte(block)})
-			}
-		}
-		for _, data := range c.BlockData {
-			w.Write(data[:])
-		}
-		for _, light := range c.LightBlock {
-			w.Write(light[:])
-		}
-		for _, light := range c.LightSky {
-			w.Write(light[:])
-		}
-		for _, biomes := range c.Biomes {
-			for _, biome := range biomes {
-				w.Write([]byte{byte(biome)})
-			}
-		}
-
-		w.Close()
-		c.compressed = buf.Bytes()
-		c.dirty = false
+	c.compressing.RLock()
+	if !c.dirty && c.compressed != nil {
+		c.compressing.RUnlock()
+		return c.compressed
 	}
+	c.compressing.RUnlock()
+
+	c.compressing.Lock()
+	defer c.compressing.Unlock()
+	if !c.dirty && c.compressed != nil {
+		return c.compressed
+	}
+	var buf bytes.Buffer
+	w := zlib.NewWriter(&buf)
+
+	for _, blocks := range c.Blocks {
+		binary.Write(w, binary.BigEndian, blocks)
+	}
+	for _, data := range c.BlockData {
+		w.Write(data[:])
+	}
+	for _, light := range c.LightBlock {
+		w.Write(light[:])
+	}
+	for _, light := range c.LightSky {
+		w.Write(light[:])
+	}
+	for _, biomes := range c.Biomes {
+		binary.Write(w, binary.BigEndian, biomes)
+	}
+
+	w.Close()
+	c.compressed = buf.Bytes()
+	c.dirty = false
+
 	return c.compressed
 }
