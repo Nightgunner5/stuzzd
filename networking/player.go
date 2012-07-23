@@ -46,12 +46,37 @@ func HandlePlayer(conn net.Conn) Player {
 		recvq := make(chan protocol.Packet)
 		go recv(p, conn, recvq)
 		sendKeepAlive := time.Tick(time.Second * 50) // 1000 ticks
-		//timeoutKeepAlive := time.After(time.Second * 60) // 1200 ticks
 		for {
 			select {
 			case packet := <-p.sendq:
 				if _, ok := packet.(protocol.Kick); ok {
 					panic(packet)
+				}
+				if _, ok := packet.(protocol.LoginRequest); ok {
+					go func() {
+						chunkSet := make(map[uint64]*protocol.Chunk)
+						for {
+							time.Sleep(100 * time.Millisecond)
+							for i, _ := range chunkSet {
+								x, z := int32(i>>32), int32(i)
+								dx, dz := int32(p.x/16)-x, int32(p.z/16)-z
+								if dx > 10 || dx < -10 || dz > 10 || dz < -10 {
+									sendChunk(p, x, z, nil)
+									delete(chunkSet, i)
+								}
+							}
+							middleX, middleZ := int32(p.x/16), int32(p.z/16)
+							for x := middleX - 8; x < middleX+8; x++ {
+								for z := middleZ - 8; z < middleZ+8; z++ {
+									i := uint64(uint32(x))<<32 | uint64(uint32(z))
+									if _, ok := chunkSet[i]; !ok {
+										chunkSet[i] = GetChunk(x, z)
+										sendChunk(p, x, z, chunkSet[i])
+									}
+								}
+							}
+						}
+					}()
 				}
 				sendPacket(p, conn, packet)
 			case packet := <-recvq:
@@ -59,9 +84,6 @@ func HandlePlayer(conn net.Conn) Player {
 					sendHTTPResponse(conn)
 					return
 				}
-				//if ka, ok := packet.(protocol.KeepAlive); ok && ka.ID == 0 {
-				//	timeoutKeepAlive = time.After(time.Second * 60)
-				//}
 				dispatchPacket(p, packet)
 				if _, ok := packet.(protocol.Kick); ok {
 					return
@@ -240,6 +262,11 @@ func (p *player) SendPosition(x, y, z float64) {
 	p.lastMoveTick = config.Tick
 	defer func() {
 		if recover() != nil {
+			if config.Tick % 20 == 0 {
+				x, z := int32(p.x)>>4, int32(p.z)>>4
+				sendChunk(p, x, z, GetChunk(x, z))
+				p.y += 2
+			}
 			SendToAllExcept(p, protocol.EntityTeleport{
 				ID:    p.id,
 				X:     p.x,
@@ -251,11 +278,7 @@ func (p *player) SendPosition(x, y, z float64) {
 			p.SendPacket(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 1.1, Y2: p.y + 0.1, Z: p.z, Yaw: deg(p.yaw), Pitch: deg(p.pitch)})
 		}
 	}()
-	if y < 0 {
-		p.y = 64.5
-		panic("fell out of world")
-	}
-	if block := GetBlockAt(int32(math.Floor(x)), int32(math.Floor(y + 0.1)), int32(math.Floor(z))); block != protocol.Air && block != protocol.StationaryWater && block != protocol.Water && block != protocol.StationaryLava && block != protocol.Lava {
+	if block := GetBlockAt(int32(math.Floor(x)), int32(math.Floor(y+0.1)), int32(math.Floor(z))); block != protocol.Air && block != protocol.StationaryWater && block != protocol.Water && block != protocol.StationaryLava && block != protocol.Lava {
 		panic("inside a block")
 	}
 

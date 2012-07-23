@@ -7,11 +7,11 @@ import (
 )
 
 func GetBlockAt(x, y, z int32) protocol.BlockType {
-	return GetChunk(x>>4, z>>4).GetBlock(uint8(x&0xF), uint8(y), uint8(z&0xF))
+	return GetChunkAt(x, z).GetBlock(uint8(x&0xF), uint8(y), uint8(z&0xF))
 }
 
 func SetBlockAt(x, y, z int32, block protocol.BlockType, data uint8) {
-	chunk := GetChunk(x>>4, z>>4)
+	chunk := GetChunkAt(x, z)
 	chunk.SetBlock(uint8(x&0xF), uint8(y), uint8(z&0xF), block)
 	chunk.SetBlockData(uint8(x&0xF), uint8(y), uint8(z&0xF), data)
 	SendToAll(protocol.BlockChange{X: x, Y: uint8(y), Z: z, Block: block, Data: data})
@@ -24,7 +24,7 @@ func loadChunk(chunkX, chunkZ int32) *protocol.Chunk {
 		for z := uint8(0); z < 16; z++ {
 			chunk.SetBlock(x, 0, z, protocol.Bedrock)
 			change1 := uint8(40 + 4 * util.Noise2(float64(x) / 16 + float64(chunkX), float64(z) / 16 + float64(chunkZ)))
-			change2 := uint8(60 + 2 * util.Noise2((float64(x) / 16 + float64(chunkX)) / 10 + 153420321.4644, (float64(z) / 16 + float64(chunkZ)) / 10 - 54413135.0542))
+			change2 := uint8(58 + 8 * util.Noise2((float64(x) / 16 + float64(chunkX)) / 10, (float64(z) / 16 + float64(chunkZ)) / 10))
 			for y := uint8(1); y < change1; y++ {
 				chunk.SetBlock(x, y, z, protocol.Stone)
 			}
@@ -32,11 +32,14 @@ func loadChunk(chunkX, chunkZ int32) *protocol.Chunk {
 				chunk.SetBlock(x, y, z, protocol.Dirt)
 			}
 			chunk.SetBlock(x, change2, z, protocol.Grass)
-			for y := uint16(0); y < 256; y++ {
-				chunk.LightSky.Set(x, uint8(y), z, 15)
-			}
 			chunk.Biomes[x][z] = protocol.Plains
 		}
+	}
+	for i := range chunk.LightSky[0] {
+		chunk.LightSky[0][i] = 255
+	}
+	for i := range chunk.LightSky {
+		chunk.LightSky[i] = chunk.LightSky[0]
 	}
 
 	return chunk
@@ -53,8 +56,18 @@ func InitSpawnArea() {
 var chunks = make(map[uint64]*protocol.Chunk)
 var chunkLock sync.RWMutex
 
+func GetChunkAt(x, z int32) *protocol.Chunk {
+	if x < 0 {
+		x -= 15
+	}
+	if z < 0 {
+		z -= 15
+	}
+	return GetChunk(x>>4, z>>4)
+}
+
 func GetChunk(x, z int32) *protocol.Chunk {
-	id := uint64(x)<<32 | uint64(z)
+	id := uint64(uint32(x))<<32 | uint64(uint32(z)) // Yes, this is required.
 	chunkLock.RLock()
 	if chunk, ok := chunks[id]; ok {
 		chunkLock.RUnlock()

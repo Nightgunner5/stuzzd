@@ -138,21 +138,12 @@ const (
 
 type BlockSection [4096]BlockType
 
-func (BlockSection) boundsCheck(x, y, z uint8) (uint32, uint32, uint32) {
-	if x > 0xF || y > 0xF || z > 0xF {
-		panic("Out of bounds block index")
-	}
-	return uint32(x), uint32(y), uint32(z)
-}
-
 func (section *BlockSection) Set(x, y, z uint8, block BlockType) {
-	X, Y, Z := section.boundsCheck(x, y, z)
-	section[Y<<8|Z<<4|X] = block
+	section[uint32(y&15)<<8|uint32(z&15)<<4|uint32(x&15)] = block
 }
 
 func (section *BlockSection) Get(x, y, z uint8) BlockType {
-	X, Y, Z := section.boundsCheck(x, y, z)
-	return section[Y<<8|Z<<4|X]
+	return section[uint32(y&15)<<8|uint32(z&15)<<4|uint32(x&15)]
 }
 
 type BlockChunk [16]BlockSection
@@ -167,31 +158,24 @@ func (chunk *BlockChunk) Get(x, y, z uint8) BlockType {
 
 type NibbleSection [2048]uint8
 
-func (NibbleSection) boundsCheck(x, y, z uint8) (uint32, uint32, uint32) {
-	if x > 0xF || y > 0xF || z > 0xF {
-		panic("Out of bounds nibble index")
-	}
-	return uint32(x), uint32(y), uint32(z)
-}
-
 func (section *NibbleSection) Set(x, y, z, nibble uint8) {
-	X, Y, Z := section.boundsCheck(x, y, z)
 	if nibble > 0xF {
 		panic("Illegal nibble value")
 	}
-	if X&1 == 1 {
-		section[Y<<7|Z<<3|X>>1] = section[Y<<7|Z<<3|X>>1]&0xF | nibble<<4
+	index := uint32(y)<<7 | uint32(z)<<3 | uint32(x)>>1
+	if x&1 == 1 {
+		section[index] = section[index]&0xF | nibble<<4
 	} else {
-		section[Y<<7|Z<<3|X>>1] = section[Y<<7|Z<<3|X>>1]&0xF0 | nibble
+		section[index] = section[index]&0xF0 | nibble
 	}
 }
 
 func (section *NibbleSection) Get(x, y, z uint8) uint8 {
-	X, Y, Z := section.boundsCheck(x, y, z)
-	if X&1 == 1 {
-		return section[Y<<7|Z<<3|X>>1] >> 4
+	index := uint32(y)<<7 | uint32(z)<<3 | uint32(x)>>1
+	if x&1 == 1 {
+		return section[index] >> 4
 	}
-	return section[Y<<7|Z<<3|X>>1] & 0xF
+	return section[index] & 0xF
 }
 
 type NibbleChunk [16]NibbleSection
@@ -233,6 +217,7 @@ const (
 )
 
 type Face uint8
+
 const (
 	FaceDown Face = iota
 	FaceUp

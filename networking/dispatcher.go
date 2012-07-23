@@ -121,10 +121,19 @@ func starUsername(name string) string {
 func SendWorldData(p Player) {
 	_X, _, _Z := p.Position()
 	X, Z := int32(_X), int32(_Z)
-	for x := int32(X>>4 - 8); x < X>>4+8; x++ {
-		for z := int32(Z>>4 - 8); z < Z>>4+8; z++ {
+	for x := int32((X>>4) - 8); x < (X>>4)+8; x++ {
+		for z := int32((Z>>4) - 8); z < (Z>>4) + 8; z++ {
 			p.SendPacket(protocol.ChunkAllocation{X: x, Z: z, Init: true})
 			p.SendPacket(protocol.ChunkData{X: x, Z: z, Chunk: GetChunk(x, z)})
 		}
+	}
+}
+
+func sendChunk(p Player, x, z int32, chunk *protocol.Chunk) {
+	if chunk == nil {
+		p.SendPacket(protocol.ChunkAllocation{X: x, Z: z, Init: false})
+	} else {
+		p.SendPacket(protocol.ChunkAllocation{X: x, Z: z, Init: true})
+		p.SendPacket(protocol.ChunkData{X: x, Z: z, Chunk: chunk})
 	}
 }
