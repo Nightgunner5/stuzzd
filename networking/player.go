@@ -2,9 +2,12 @@ package networking
 
 import (
 	"fmt"
+	"github.com/Nightgunner5/stuzzd/config"
 	"github.com/Nightgunner5/stuzzd/protocol"
+	"github.com/Nightgunner5/stuzzd/storage"
 	"io"
 	"log"
+	"math"
 	"math/rand"
 	"net"
 	"strings"
@@ -29,6 +32,12 @@ func HandlePlayer(conn net.Conn) Player {
 			}
 			RemoveEntity(p)
 			if p.authenticated {
+				stored := storage.GetPlayer(p.Username())
+				x, y, z := p.Position()
+				stored.Position = []float64{x, y, z}
+				yaw, pitch := p.Angles()
+				stored.Rotation = []float32{yaw, pitch}
+				stored.Save()
 				OnlinePlayerCount--
 			}
 			time.Sleep(1 * time.Second)
@@ -134,14 +143,20 @@ func recv(p Player, in io.Reader, recvq chan<- protocol.Packet) {
 			recvq <- protocol.ReadPlayerLook(in)
 		case 0x0D:
 			recvq <- protocol.ReadPlayerPositionLook(in)
+		case 0x0E:
+			recvq <- protocol.ReadPlayerDigging(in)
+		case 0x0F:
+			panic("NO CLICKING!")
 		case 0x10:
 			in.Read(make([]byte, 2)) // TODO
 		case 0x12:
-			in.Read(make([]byte, 5)) // TODO
+			recvq <- protocol.ReadAnimation(in)
 		case 0x13:
 			in.Read(make([]byte, 5)) // TODO
 		case 0x47: // When the server sends this, it's a lightning bolt. When the client sends it, it means they're doing a HTTP GET. Switch over to the HTTP handler.
 			recvq <- SwitchToHttp{}
+		case 0x65:
+			in.Read(make([]byte, 1)) // TODO
 		case 0xCA:
 			recvq <- protocol.ReadPlayerAbilities(in)
 		case 0xFE:
@@ -149,7 +164,7 @@ func recv(p Player, in io.Reader, recvq chan<- protocol.Packet) {
 		case 0xFF:
 			recvq <- protocol.ReadKick(in)
 		default:
-			panic(fmt.Sprint("Unknown packet ID dropped: ", id[0]))
+			panic(fmt.Sprintf("Unknown packet ID dropped: %x", id[0]))
 		}
 	}
 }
@@ -191,6 +206,8 @@ type player struct {
 	x, y, z       float64
 	pitch, yaw    float32 // radians, not degrees (!)
 	movecounter   uint8
+	lastMoveTick  uint64
+	gameMode      protocol.ServerMode
 }
 
 func (p *player) setUsername(username string) {
@@ -217,9 +234,13 @@ func (p *player) Authenticated() bool {
 }
 
 func (p *player) SendPosition(x, y, z float64) {
+	if p.lastMoveTick == config.Tick {
+		return
+	}
+	p.lastMoveTick = config.Tick
 	defer func() {
 		if recover() != nil {
-			SendToAll(protocol.EntityTeleport{
+			SendToAllExcept(p, protocol.EntityTeleport{
 				ID:    p.id,
 				X:     p.x,
 				Y:     p.y,
@@ -227,15 +248,15 @@ func (p *player) SendPosition(x, y, z float64) {
 				Yaw:   p.yaw,
 				Pitch: p.pitch,
 			})
-			p.SendPacket(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 1, Y2: p.y, Z: p.z, Yaw: deg(p.yaw), Pitch: deg(p.pitch)})
+			p.SendPacket(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 1.1, Y2: p.y + 0.1, Z: p.z, Yaw: deg(p.yaw), Pitch: deg(p.pitch)})
 		}
 	}()
-	// TEMPORARY
-	if y < 63.5 {
-		if p.y < 64 {
-			p.y = 64
-		}
-		panic("TEMPORARY")
+	if y < 0 {
+		p.y = 64.5
+		panic("fell out of world")
+	}
+	if block := GetBlockAt(int32(math.Floor(x)), int32(math.Floor(y + 0.1)), int32(math.Floor(z))); block != protocol.Air && block != protocol.StationaryWater && block != protocol.Water && block != protocol.StationaryLava && block != protocol.Lava {
+		panic("inside a block")
 	}
 
 	p.movecounter++
@@ -284,18 +305,18 @@ func (p *player) Angles() (yaw, pitch float32) {
 }
 
 func (p *player) makeSpawnPacket() protocol.SpawnNamedEntity {
-	return protocol.SpawnNamedEntity{EID: p.id, Name: p.username, X: p.x, Y: p.y, Z: p.z}
+	return protocol.SpawnNamedEntity{EID: p.id, Name: p.username, X: p.x, Y: p.y, Z: p.z, Yaw: p.yaw, Pitch: p.pitch}
 }
 
 func (p *player) sendSpawnPacket() {
-	p.SendPacket(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 2.7, Y2: p.y + 3.7, Z: p.z, Ground: true})
+	p.SendPacket(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 2, Y2: p.y + 3, Z: p.z, Ground: true, Yaw: p.yaw, Pitch: p.pitch})
 }
 
 func sendPacket(p Player, conn net.Conn, packet protocol.Packet) {
 	if kick, ok := packet.(protocol.Kick); ok {
 		if !strings.Contains(kick.Reason, "§") {
 			log.Print("Kicking ", conn.RemoteAddr(), " - ", kick.Reason)
-			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s was kicked: %s", p.Username(), kick.Reason)})
+			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s was kicked: %s", formatUsername(p.Username()), kick.Reason)})
 		}
 	}
 	if _, err := conn.Write(packet.Packet()); err != nil {

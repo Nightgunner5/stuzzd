@@ -2,12 +2,14 @@ package main
 
 import (
 	"flag"
+	"github.com/Nightgunner5/stuzzd/config"
 	"github.com/Nightgunner5/stuzzd/networking"
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"log"
 	"net"
 	"os"
 	"os/signal"
+	"runtime"
 	"runtime/pprof"
 	"syscall"
 	"time"
@@ -20,6 +22,8 @@ const TICK = time.Second / 20
 
 func main() {
 	flag.Parse()
+
+	runtime.GOMAXPROCS(4)
 
 	if *flagCPUProfile != "" {
 		log.Print("Profiling to file ", *flagCPUProfile, " started.")
@@ -39,6 +43,8 @@ func main() {
 		}()
 	}
 
+	go networking.InitSpawnArea()
+
 	ln, err := net.Listen("tcp", *flagHostPort)
 	if err != nil {
 		log.Fatal(err)
@@ -56,12 +62,11 @@ func main() {
 		}
 	}()
 
-	var curTick uint64
 	for {
 		time.Sleep(TICK)
-		curTick++
-		if curTick%100 == 0 {
-			networking.SendToAll(protocol.TimeUpdate{Time: curTick})
+		config.Tick++
+		if config.Tick%100 == 0 {
+			networking.SendToAll(protocol.TimeUpdate{Time: config.Tick})
 		}
 	}
 }

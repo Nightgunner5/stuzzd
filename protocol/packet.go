@@ -359,12 +359,63 @@ func ReadPlayerPositionLook(in io.Reader) PlayerPositionLook {
 	return p
 }
 
+// Player Digging (0x0E)
+type PlayerDigging struct {
+	Status uint8
+	X      int32
+	Y      uint8
+	Z      int32
+	Face   Face
+}
+
+func (p PlayerDigging) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x0E))
+	binary.Write(&buf, binary.BigEndian, p.Status)
+	binary.Write(&buf, binary.BigEndian, p.X)
+	binary.Write(&buf, binary.BigEndian, p.Y)
+	binary.Write(&buf, binary.BigEndian, p.Z)
+	binary.Write(&buf, binary.BigEndian, p.Face)
+	return buf.Bytes()
+}
+
+func ReadPlayerDigging(in io.Reader) PlayerDigging {
+	var p PlayerDigging
+	binary.Read(in, binary.BigEndian, &p.Status)
+	binary.Read(in, binary.BigEndian, &p.X)
+	binary.Read(in, binary.BigEndian, &p.Y)
+	binary.Read(in, binary.BigEndian, &p.Z)
+	binary.Read(in, binary.BigEndian, &p.Face)
+	return p
+}
+
+// Animation (0x12)
+type Animation struct {
+	EID uint32
+	Animation uint8
+}
+
+func (p Animation) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x12))
+	binary.Write(&buf, binary.BigEndian, p.EID)
+	binary.Write(&buf, binary.BigEndian, p.Animation)
+	return buf.Bytes()
+}
+
+func ReadAnimation(in io.Reader) Animation {
+	var p Animation
+	binary.Read(in, binary.BigEndian, &p.EID)
+	binary.Read(in, binary.BigEndian, &p.Animation)
+	return p
+}
+
 // Spawn Named Entity (0x14)
 type SpawnNamedEntity struct {
 	EID        uint32
 	Name       string
 	X, Y, Z    float64
-	Yaw, Pitch int8 // TODO
+	Yaw, Pitch float32
 	ItemInHand uint16
 }
 
@@ -376,7 +427,8 @@ func (p SpawnNamedEntity) Packet() []byte {
 	encodeDouble(p.X, &buf)
 	encodeDouble(p.Y, &buf)
 	encodeDouble(p.Z, &buf)
-	buf.Write([]byte{0, 0})
+	encodeAngle(p.Yaw, &buf)
+	encodeAngle(p.Pitch, &buf)
 	binary.Write(&buf, binary.BigEndian, p.ItemInHand)
 	return buf.Bytes()
 }
@@ -511,6 +563,28 @@ func (p ChunkData) Packet() []byte {
 	binary.Write(&buf, binary.BigEndian, int32(len(payload)))
 	binary.Write(&buf, binary.BigEndian, int32(0))
 	buf.Write(payload)
+	return buf.Bytes()
+}
+
+// No read function as this is not sent by the client.
+
+// Block Change (0x35)
+type BlockChange struct {
+	X int32
+	Y uint8
+	Z int32
+	Block BlockType
+	Data uint8
+}
+
+func (p BlockChange) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x35))
+	binary.Write(&buf, binary.BigEndian, p.X)
+	binary.Write(&buf, binary.BigEndian, p.Y)
+	binary.Write(&buf, binary.BigEndian, p.Z)
+	binary.Write(&buf, binary.BigEndian, p.Block)
+	binary.Write(&buf, binary.BigEndian, p.Data)
 	return buf.Bytes()
 }
 

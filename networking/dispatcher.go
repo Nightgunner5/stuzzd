@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"github.com/Nightgunner5/stuzzd/config"
 	"github.com/Nightgunner5/stuzzd/protocol"
+	"github.com/Nightgunner5/stuzzd/storage"
 	"log"
 	"net/http"
 	"strings"
-	"time"
 )
 
 func dispatchPacket(p Player, packet protocol.Packet) {
@@ -27,25 +27,25 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 		if string(buf) == "YES" {
 			p.(*player).authenticated = true
 			OnlinePlayerCount++
+			p.(*player).gameMode = protocol.Survival
+			if p.Username() == "Nightgunner5" || p.Username() == "7031" {
+				p.(*player).gameMode = protocol.Creative
+			}
 			p.SendPacket(protocol.LoginRequest{
 				EntityID:   p.ID(),
 				LevelType:  "default",
-				ServerMode: protocol.Creative,
+				ServerMode: p.(*player).gameMode,
 				Dimension:  protocol.Overworld,
 				Difficulty: protocol.Peaceful,
 				MaxPlayers: config.NumSlots(),
 			})
+			stored := storage.GetPlayer(p.Username())
+			p.SetPosition(stored.Position[0], stored.Position[1], stored.Position[2])
+			p.SetAngles(stored.Rotation[0], stored.Rotation[1])
 			SendWorldData(p)
-			p.SetPosition(8.5, 65, 8.5)
 			p.sendSpawnPacket()
-			go func() {
-				for i := time.Duration(0); i < 10; i++ {
-					time.Sleep(i * time.Millisecond * 10)
-					p.sendSpawnPacket()
-				}
-			}()
 			log.Print(p.Username(), " connected.")
-			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s connected.", p.Username())})
+			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s connected.", formatUsername(p.Username()))})
 			for _, player := range players {
 				if player != p {
 					p.SendPacket(player.makeSpawnPacket())
@@ -56,9 +56,12 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 			p.SendPacket(protocol.Kick{Reason: "Failed to verify username!"})
 		}
 	case protocol.Chat:
-		chat := fmt.Sprintf("<%s> %s", p.Username(), pkt.Message)
-		log.Print(chat)
-		SendToAll(protocol.Chat{Message: chat})
+		if pkt.Message[0] == '/' {
+			handleCommand(p, string(pkt.Message[1:]))
+		} else {
+			log.Printf("<%s> %s", p.Username(), pkt.Message)
+			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s %s", bracketUsername(p.Username()), pkt.Message)})
+		}
 	case protocol.Handshake:
 		data := strings.Split(pkt.Data, ";")
 		p.setUsername(data[0])
@@ -74,21 +77,52 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 		p.SendAngles(rad(pkt.Yaw), rad(pkt.Pitch))
 		p.SendPosition(pkt.X, pkt.Y1, pkt.Z)
 		// TODO: validation
+	case protocol.PlayerDigging:
+		switch pkt.Status {
+		case 0:
+			if p.(*player).gameMode != protocol.Creative {
+				break
+			}
+			fallthrough
+		case 2:
+			if GetBlockAt(pkt.X, int32(pkt.Y), pkt.Z) != protocol.Bedrock {
+				SetBlockAt(pkt.X, int32(pkt.Y), pkt.Z, protocol.Air, 0)
+			}
+		}
+		// TODO: validation
+	case protocol.Animation:
+		if pkt.EID == p.ID() && pkt.Animation == 1 {
+			SendToAllExcept(p, pkt)
+		}
 	case protocol.PlayerAbilities:
 		// TODO
 	case protocol.ServerListPing:
 		p.SendPacket(protocol.Kick{Reason: fmt.Sprintf("%s§%d§%d", config.ServerDescription(), OnlinePlayerCount, config.NumSlots())})
 	case protocol.Kick:
 		log.Print(p.Username(), " disconnected.")
-		SendToAll(protocol.Chat{Message: fmt.Sprintf("%s disconnected.", p.Username())})
+		SendToAll(protocol.Chat{Message: fmt.Sprintf("%s disconnected.", formatUsername(p.Username()))})
 	default:
 		panic(fmt.Sprintf("%T %v", packet, packet))
 	}
 }
 
+func formatUsername(name string) string {
+	return "§6§l" + name + "§r§7"
+}
+
+func bracketUsername(name string) string {
+	return "§7<" + formatUsername(name) + ">§r"
+}
+
+func starUsername(name string) string {
+	return "§7* " + formatUsername(name) + "§r"
+}
+
 func SendWorldData(p Player) {
-	for x := int32(-16); x < 16; x++ {
-		for z := int32(-16); z < 16; z++ {
+	_X, _, _Z := p.Position()
+	X, Z := int32(_X), int32(_Z)
+	for x := int32(X>>4 - 8); x < X>>4+8; x++ {
+		for z := int32(Z>>4 - 8); z < Z>>4+8; z++ {
 			p.SendPacket(protocol.ChunkAllocation{X: x, Z: z, Init: true})
 			p.SendPacket(protocol.ChunkData{X: x, Z: z, Chunk: GetChunk(x, z)})
 		}

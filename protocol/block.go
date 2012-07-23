@@ -232,6 +232,16 @@ const (
 	JungleHills         Biome = 22
 )
 
+type Face uint8
+const (
+	FaceDown Face = iota
+	FaceUp
+	FaceWest
+	FaceEast
+	FaceSouth
+	FaceNorth
+)
+
 type Chunk struct {
 	Blocks      BlockChunk
 	BlockData   NibbleChunk
