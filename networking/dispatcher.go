@@ -46,9 +46,9 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 			p.sendWorldData()
 			log.Print(p.Username(), " connected.")
 			if customLoginMessage(p) != "" {
-				SendToAll(protocol.Chat{Message: fmt.Sprintf(customLoginMessage(p), formatUsername(p.Username()))})
+				SendToAll(protocol.Chat{Message: fmt.Sprintf(customLoginMessage(p), formatUsername(p))})
 			} else {
-				SendToAll(protocol.Chat{Message: fmt.Sprintf("%s connected.", formatUsername(p.Username()))})
+				SendToAll(protocol.Chat{Message: fmt.Sprintf("%s connected.", formatUsername(p))})
 			}
 			for _, player := range players {
 				if player != p {
@@ -64,7 +64,7 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 			handleCommand(p, string(pkt.Message[1:]))
 		} else {
 			log.Printf("<%s> %s", p.Username(), pkt.Message)
-			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s %s", bracketUsername(p.Username()), pkt.Message)})
+			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s %s", bracketUsername(p), pkt.Message)})
 		}
 	case protocol.Handshake:
 		data := strings.Split(pkt.Data, ";")
@@ -104,22 +104,10 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 		p.SendPacket(protocol.Kick{Reason: fmt.Sprintf("%s§%d§%d", config.ServerDescription(), OnlinePlayerCount, config.NumSlots())})
 	case protocol.Kick:
 		log.Print(p.Username(), " disconnected.")
-		SendToAll(protocol.Chat{Message: fmt.Sprintf("%s disconnected.", formatUsername(p.Username()))})
+		SendToAll(protocol.Chat{Message: fmt.Sprintf("%s disconnected.", formatUsername(p))})
 	default:
 		panic(fmt.Sprintf("%T %v", packet, packet))
 	}
-}
-
-func formatUsername(name string) string {
-	return "§6§l" + name + "§r§7"
-}
-
-func bracketUsername(name string) string {
-	return "§7<" + formatUsername(name) + ">§r"
-}
-
-func starUsername(name string) string {
-	return "§7* " + formatUsername(name) + "§r"
 }
 
 func sendChunk(p Player, x, z int32, chunk *protocol.Chunk) {
