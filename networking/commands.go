@@ -1,13 +1,13 @@
 package networking
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/Nightgunner5/stuzzd/protocol"
-	"log"
-	"strings"
-	"os"
-	"bufio"
 	"io"
+	"log"
+	"os"
+	"strings"
 	"sync"
 )
 
@@ -18,27 +18,141 @@ const (
 	ChatName         = "§6§l"
 	ChatNameOp       = "§4§l"
 	ChatNameNetAdmin = "§3§l"
+	ChatNotAllowed   = ChatError + "You do not have the required permission to use that command."
 )
 
+var CommandHelp = map[string]struct {
+	Description string
+	OpOnly      bool
+}{
+	"help": {Description: "This command.", OpOnly: false},
+	"me":   {Description: "Describe an action, like \"/me eats a cupcake.\"", OpOnly: false},
+	"who":  {Description: "List the players currently online.", OpOnly: false},
+	"op":   {Description: "Give a player operator status.", OpOnly: true},
+	"deop": {Description: "Revoke a player's operator status.", OpOnly: true},
+	"kick": {Description: "Kick a player from the server with an optional message.", OpOnly: true},
+}
+
 func handleCommand(player Player, command string) {
+	defer func() { recover() }()
 	words := strings.Split(command, " ")
 	switch words[0] {
-	case "me", "pl", "players", "list", "who":
+	case "me", "pl", "players", "list", "who", "help":
 		// Don't spam the log.
 	default:
 		log.Printf("Command from %s: /%s", player.Username(), command)
 	}
 	switch words[0] {
 	case "me":
+		if len(words) < 2 {
+			return
+		}
 		message := strings.Join(words[1:], " ")
 		log.Printf("* %s %s", player.Username(), message)
 		SendToAll(protocol.Chat{Message: fmt.Sprintf("%s %s", starUsername(player), message)})
 	case "pl", "players", "list", "who":
 		message := make([]string, 0, len(players))
 		for _, p := range players {
-			message = append(message, formatUsername(p))
+			if p.Authenticated() {
+				message = append(message, formatUsername(p))
+			}
 		}
 		player.SendPacket(protocol.Chat{Message: ChatInfo + "Currently online: " + strings.Join(message, ", ")})
+	case "help":
+		player.SendPacket(protocol.Chat{Message: ChatInfo + "=== " + ChatPayload + "Help" + ChatInfo + " ==="})
+		for command, info := range CommandHelp {
+			if info.OpOnly {
+				if !IsOp(player) {
+					continue
+				}
+				player.SendPacket(protocol.Chat{Message: ChatNameOp + command + ChatInfo + " - " + ChatPayload + info.Description})
+			} else {
+				player.SendPacket(protocol.Chat{Message: ChatName + command + ChatInfo + " - " + ChatPayload + info.Description})
+			}
+		}
+	case "op":
+		if !IsOp(player) {
+			if isNetworkAdmin(player) {
+				player.SendPacket(protocol.Chat{Message: ChatInfo + "Using network admin override..."})
+			} else {
+				player.SendPacket(protocol.Chat{Message: ChatNotAllowed})
+				return
+			}
+		}
+
+		var target Player
+		for _, p := range players {
+			if p.Authenticated() && p.Username() == words[1] {
+				target = p
+				break
+			}
+		}
+		if target == nil {
+			player.SendPacket(protocol.Chat{Message: ChatError + "Could not find target."})
+			return
+		}
+
+		if GrantOp(target) {
+			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s has been given Operator privelages by %s.", formatUsername(target), formatUsername(player))})
+		} else {
+			player.SendPacket(protocol.Chat{Message: ChatError + "Target already has Op!"})
+		}
+	case "deop", "unop":
+		if !IsOp(player) {
+			if isNetworkAdmin(player) {
+				player.SendPacket(protocol.Chat{Message: ChatInfo + "Using network admin override..."})
+			} else {
+				player.SendPacket(protocol.Chat{Message: ChatNotAllowed})
+				return
+			}
+		}
+
+		var target Player
+		for _, p := range players {
+			if p.Authenticated() && p.Username() == words[1] {
+				target = p
+				break
+			}
+		}
+		if target == nil {
+			player.SendPacket(protocol.Chat{Message: ChatError + "Could not find target."})
+			return
+		}
+
+		if RevokeOp(target) {
+			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s has had their Operator privelages revoked by %s.", formatUsername(target), formatUsername(player))})
+		} else {
+			player.SendPacket(protocol.Chat{Message: ChatError + "Target doesn't have Op!"})
+		}
+	case "kick":
+		if !IsOp(player) {
+			if isNetworkAdmin(player) {
+				player.SendPacket(protocol.Chat{Message: ChatInfo + "Using network admin override..."})
+			} else {
+				player.SendPacket(protocol.Chat{Message: ChatNotAllowed})
+				return
+			}
+		}
+
+		var target Player
+		for _, p := range players {
+			if p.Authenticated() && p.Username() == words[1] {
+				target = p
+				break
+			}
+		}
+		if target == nil {
+			player.SendPacket(protocol.Chat{Message: ChatError + "Could not find target."})
+			return
+		}
+
+		message := "No reason given"
+		if len(words) > 2 {
+			message = "\"" + strings.Join(words[2:], " ") + "\""
+		}
+
+		target.SendPacket(protocol.Kick{Reason: "Kicked by admin: " + message})
+
 	default:
 		player.SendPacket(protocol.Chat{Message: ChatError + "Unknown command."})
 	}
@@ -75,6 +189,7 @@ func IsOp(player Player) bool {
 }
 
 var opLock sync.Mutex
+
 func GrantOp(player Player) bool {
 	opLock.Lock()
 	defer opLock.Unlock()
@@ -105,7 +220,7 @@ func saveOps() {
 	f, _ := os.Create("ops.txt")
 	defer f.Close()
 	for op, _ := range ops {
-		io.WriteString(f, op + "\n")
+		io.WriteString(f, op+"\n")
 	}
 }
 
