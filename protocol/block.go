@@ -257,6 +257,12 @@ func (c *Chunk) GetBlockData(x, y, z uint8) uint8 {
 	return c.BlockData.Get(x, y, z)
 }
 
+func panicIfError(n int, err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (c *Chunk) Compressed() []byte {
 	c.compressing.RLock()
 	if !c.dirty && c.compressed != nil {
@@ -274,19 +280,19 @@ func (c *Chunk) Compressed() []byte {
 	w := zlib.NewWriter(&buf)
 
 	for _, blocks := range c.Blocks {
-		binary.Write(w, binary.BigEndian, blocks)
+		panicIfError(0, binary.Write(w, binary.BigEndian, blocks))
 	}
 	for _, data := range c.BlockData {
-		w.Write(data[:])
+		panicIfError(w.Write(data[:]))
 	}
 	for _, light := range c.LightBlock {
-		w.Write(light[:])
+		panicIfError(w.Write(light[:]))
 	}
 	for _, light := range c.LightSky {
-		w.Write(light[:])
+		panicIfError(w.Write(light[:]))
 	}
 	for _, biomes := range c.Biomes {
-		binary.Write(w, binary.BigEndian, biomes)
+		panicIfError(0, binary.Write(w, binary.BigEndian, biomes))
 	}
 
 	w.Close()

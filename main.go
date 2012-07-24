@@ -33,16 +33,7 @@ func main() {
 		}
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
-		go func() {
-			ch := make(chan os.Signal, 1)
-			signal.Notify(ch, syscall.SIGINT)
-			<-ch
-			log.Print("Finishing up profile information...")
-			pprof.StopCPUProfile()
-			os.Exit(0)
-		}()
 	}
-
 	go networking.InitSpawnArea()
 
 	ln, err := net.Listen("tcp", *flagHostPort)
@@ -60,6 +51,19 @@ func main() {
 			}
 			networking.RegisterEntity(networking.HandlePlayer(conn))
 		}
+	}()
+
+	go func() {
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, syscall.SIGINT)
+		<-ch
+		log.Print("Saving ALL the data!")
+		networking.SaveAllTheThings()
+		if *flagCPUProfile != "" {
+			log.Print("Finishing up profile information...")
+			pprof.StopCPUProfile()
+		}
+		os.Exit(0)
 	}()
 
 	for {

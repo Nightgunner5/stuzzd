@@ -42,8 +42,7 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 			stored := storage.GetPlayer(p.Username())
 			p.SetPosition(stored.Position[0], stored.Position[1], stored.Position[2])
 			p.SetAngles(stored.Rotation[0], stored.Rotation[1])
-			SendWorldData(p)
-			p.sendSpawnPacket()
+			p.sendWorldData()
 			log.Print(p.Username(), " connected.")
 			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s connected.", formatUsername(p.Username()))})
 			for _, player := range players {
@@ -118,22 +117,17 @@ func starUsername(name string) string {
 	return "§7* " + formatUsername(name) + "§r"
 }
 
-func SendWorldData(p Player) {
-	_X, _, _Z := p.Position()
-	X, Z := int32(_X), int32(_Z)
-	for x := int32((X>>4) - 8); x < (X>>4)+8; x++ {
-		for z := int32((Z>>4) - 8); z < (Z>>4) + 8; z++ {
-			p.SendPacket(protocol.ChunkAllocation{X: x, Z: z, Init: true})
-			p.SendPacket(protocol.ChunkData{X: x, Z: z, Chunk: GetChunk(x, z)})
-		}
-	}
-}
-
 func sendChunk(p Player, x, z int32, chunk *protocol.Chunk) {
 	if chunk == nil {
+		log.Printf("Unloading chunk at (%d, %d) for %s", x, z, p.Username())
 		p.SendPacket(protocol.ChunkAllocation{X: x, Z: z, Init: false})
 	} else {
+		log.Printf("Sending chunk at (%d, %d) to %s", x, z, p.Username())
 		p.SendPacket(protocol.ChunkAllocation{X: x, Z: z, Init: true})
 		p.SendPacket(protocol.ChunkData{X: x, Z: z, Chunk: chunk})
 	}
+}
+
+func SaveAllTheThings() {
+	SendToAll(protocol.Kick{Reason: "Server is shutting down!"})
 }
