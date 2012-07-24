@@ -3,8 +3,8 @@ package networking
 import (
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"github.com/Nightgunner5/stuzzd/util"
-	"sync"
 	"runtime"
+	"sync"
 )
 
 func GetBlockAt(x, y, z int32) protocol.BlockType {
@@ -24,8 +24,8 @@ func loadChunk(chunkX, chunkZ int32) *protocol.Chunk {
 	for x := uint8(0); x < 16; x++ {
 		for z := uint8(0); z < 16; z++ {
 			chunk.SetBlock(x, 0, z, protocol.Bedrock)
-			change1 := uint8(40 + 4 * util.Noise2(float64(x) / 16 + float64(chunkX), float64(z) / 16 + float64(chunkZ)))
-			change2 := uint8(58 + 8 * util.Noise2((float64(x) / 16 + float64(chunkX)) / 10, (float64(z) / 16 + float64(chunkZ)) / 10))
+			change1 := uint8(40 + 4*util.Noise2(float64(x)/16+float64(chunkX), float64(z)/16+float64(chunkZ)))
+			change2 := uint8(58 + 8*util.Noise2((float64(x)/16+float64(chunkX))/10, (float64(z)/16+float64(chunkZ))/10))
 			for y := uint8(1); y < change1; y++ {
 				chunk.SetBlock(x, y, z, protocol.Stone)
 			}
@@ -45,7 +45,9 @@ func InitSpawnArea() {
 	for x := int32(-8); x < 8; x++ {
 		for z := int32(-8); z < 8; z++ {
 			runtime.Gosched() // We want to accept connections while we start up, even on GOMAXPROCS=1.
-			GetChunk(x, z).Compressed()
+			chunk := GetChunkMark(x, z)
+			chunk.Compressed()
+			chunk.MarkUnused()
 		}
 	}
 }
@@ -71,4 +73,37 @@ func GetChunk(x, z int32) *protocol.Chunk {
 
 	chunks[id] = loadChunk(x, z)
 	return chunks[id]
+}
+
+func GetChunkMark(x, z int32) *protocol.Chunk {
+	id := uint64(uint32(x))<<32 | uint64(uint32(z))
+	chunkLock.RLock()
+	if chunk, ok := chunks[id]; ok {
+		chunk.MarkUsed()
+		chunkLock.RUnlock()
+		return chunk
+	}
+	chunkLock.RUnlock()
+
+	chunkLock.Lock()
+	defer chunkLock.Unlock()
+
+	chunks[id] = loadChunk(x, z)
+	chunks[id].MarkUsed()
+	return chunks[id]
+}
+
+func init() {
+	protocol.RecycleChunk = func(c *protocol.Chunk) {
+		chunkLock.Lock()
+		defer chunkLock.Unlock()
+
+		for id, chunk := range chunks {
+			if chunk == c {
+				c.Save()
+				delete(chunks, id)
+				return
+			}
+		}
+	}
 }

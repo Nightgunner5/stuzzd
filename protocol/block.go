@@ -2,9 +2,11 @@ package protocol
 
 import (
 	"bytes"
-	"encoding/binary"
 	"compress/zlib"
+	"encoding/binary"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 type BlockType uint8
@@ -229,14 +231,17 @@ const (
 )
 
 type Chunk struct {
-	blocks      BlockChunk
-	blockData   NibbleChunk
-	lightBlock  NibbleChunk
-	lightSky    NibbleChunk
-	biomes      [16][16]Biome
-	dirty       bool
-	compressed  []byte
-	lock        sync.RWMutex
+	blocks           BlockChunk
+	blockData        NibbleChunk
+	lightBlock       NibbleChunk
+	lightSky         NibbleChunk
+	biomes           [16][16]Biome
+	dirty            bool
+	needsSave        bool
+	compressed       []byte
+	lock             sync.RWMutex
+	users            int64
+	interruptRecycle chan<- bool
 }
 
 func (c *Chunk) SetBlock(x, y, z uint8, block BlockType) {
@@ -244,6 +249,7 @@ func (c *Chunk) SetBlock(x, y, z uint8, block BlockType) {
 	defer c.lock.Unlock()
 	c.blocks.Set(x, y, z, block)
 	c.dirty = true
+	c.needsSave = true
 }
 
 func (c *Chunk) GetBlock(x, y, z uint8) BlockType {
@@ -257,6 +263,7 @@ func (c *Chunk) SetBlockData(x, y, z, data uint8) {
 	defer c.lock.Unlock()
 	c.blockData.Set(x, y, z, data)
 	c.dirty = true
+	c.needsSave = true
 }
 
 func (c *Chunk) GetBlockData(x, y, z uint8) uint8 {
@@ -270,6 +277,7 @@ func (c *Chunk) SetBiome(x, z uint8, biome Biome) {
 	defer c.lock.Unlock()
 	c.biomes[z][x] = biome
 	c.dirty = true
+	c.needsSave = true
 }
 
 func (c *Chunk) GetBiome(x, z uint8) Biome {
@@ -289,6 +297,7 @@ func (c *Chunk) InitLighting() {
 		c.lightSky[i] = c.lightSky[0]
 	}
 	c.dirty = true
+	c.needsSave = true
 }
 
 func panicIfError(n int, err error) {
@@ -335,3 +344,44 @@ func (c *Chunk) Compressed() []byte {
 
 	return c.compressed
 }
+
+func (c *Chunk) MarkUsed() {
+	atomic.AddInt64(&c.users, 1)
+	if c.interruptRecycle != nil {
+		c.interruptRecycle <- true
+		c.interruptRecycle = nil
+	}
+}
+
+func (c *Chunk) MarkUnused() {
+	users := atomic.AddInt64(&c.users, -1)
+	if users == 0 {
+		interrupt := make(chan bool, 1)
+		c.interruptRecycle = interrupt
+		go func() {
+			select {
+			case <-interrupt:
+				return
+			case <-time.After(30 * time.Second):
+				RecycleChunk(c)
+			}
+		}()
+	}
+	if users < 0 {
+		panic("Use count < 0")
+	}
+}
+
+func (c *Chunk) Save() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if !c.needsSave {
+		return
+	}
+
+	// TODO: actually save the chunk
+	c.needsSave = false
+}
+
+var RecycleChunk func(*Chunk)

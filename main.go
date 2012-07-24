@@ -16,6 +16,7 @@ import (
 
 var flagHostPort = flag.String("hostport", ":25565", "The host and port to listen on. Blank host means listening on all interfaces.")
 var flagCPUProfile = flag.String("cpuprofile", "", "write cpu profile to file")
+var flagMemProfile = flag.String("memprofile", "", "write memory profile to file")
 
 const TICK = time.Second / 20
 
@@ -59,6 +60,15 @@ func main() {
 		if *flagCPUProfile != "" {
 			log.Print("Finishing up profile information...")
 			pprof.StopCPUProfile()
+		}
+		if *flagMemProfile != "" {
+			log.Print("Writing memory profile...")
+			f, err := os.Create(*flagMemProfile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			pprof.WriteHeapProfile(f)
+
 		}
 		os.Exit(0)
 	}()

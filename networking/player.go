@@ -10,6 +10,7 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -19,6 +20,7 @@ var OnlinePlayerCount uint8
 func HandlePlayer(conn net.Conn) Player {
 	p := new(player)
 	p.id = assignID()
+	p.chunkSet = make(map[uint64]*protocol.Chunk)
 	p.sendq = make(chan protocol.Packet)
 	go func() {
 		defer func() {
@@ -206,6 +208,7 @@ type player struct {
 	lastMoveTick  uint64
 	lastStuckTick uint64
 	gameMode      protocol.ServerMode
+	chunkSet      map[uint64]*protocol.Chunk
 }
 
 func (p *player) setUsername(username string) {
@@ -292,24 +295,24 @@ func (p *player) SendPosition(x, y, z float64) {
 func (p *player) sendWorldData() {
 	go func() {
 		spawned := false
-		chunkSet := make(map[uint64]*protocol.Chunk)
 		for {
-			for i, _ := range chunkSet {
+			for i, chunk := range p.chunkSet {
 				x, z := int32(i>>32), int32(i)
-				dx, dz := int32(p.x/16)-x, int32(p.z/16)-z
+				dx, dz := int32(p.x)>>4-x, int32(p.z)>>4-z
 				if dx > 10 || dx < -10 || dz > 10 || dz < -10 {
+					chunk.MarkUnused()
 					sendChunk(p, x, z, nil)
-					delete(chunkSet, i)
+					delete(p.chunkSet, i)
 				}
 			}
 			middleX, middleZ := int32(p.x/16), int32(p.z/16)
 			for x := middleX - 8; x < middleX+8; x++ {
 				for z := middleZ - 8; z < middleZ+8; z++ {
 					i := uint64(uint32(x))<<32 | uint64(uint32(z))
-					if _, ok := chunkSet[i]; !ok {
-						chunkSet[i] = GetChunk(x, z)
-						sendChunk(p, x, z, chunkSet[i])
-						time.Sleep(10 * time.Millisecond)
+					if _, ok := p.chunkSet[i]; !ok {
+						p.chunkSet[i] = GetChunkMark(x, z)
+						sendChunk(p, x, z, p.chunkSet[i])
+						runtime.Gosched()
 					}
 				}
 			}
@@ -355,8 +358,11 @@ func (p *player) sendSpawnPacket() {
 func sendPacket(p Player, conn net.Conn, packet protocol.Packet) {
 	if kick, ok := packet.(protocol.Kick); ok {
 		if !strings.Contains(kick.Reason, "§") {
-			log.Print("Kicking ", conn.RemoteAddr(), " - ", kick.Reason)
+			log.Print("Kicking ", conn.RemoteAddr(), " ", p.Username(), " - ", kick.Reason)
 			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s was kicked: %s", formatUsername(p.Username()), kick.Reason)})
+		}
+		for _, chunk := range p.(*player).chunkSet {
+			chunk.MarkUnused()
 		}
 	}
 	if _, err := conn.Write(packet.Packet()); err != nil {

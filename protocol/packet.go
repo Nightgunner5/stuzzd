@@ -391,7 +391,7 @@ func ReadPlayerDigging(in io.Reader) PlayerDigging {
 
 // Animation (0x12)
 type Animation struct {
-	EID uint32
+	EID       uint32
 	Animation uint8
 }
 
@@ -570,11 +570,11 @@ func (p ChunkData) Packet() []byte {
 
 // Block Change (0x35)
 type BlockChange struct {
-	X int32
-	Y uint8
-	Z int32
+	X     int32
+	Y     uint8
+	Z     int32
 	Block BlockType
-	Data uint8
+	Data  uint8
 }
 
 func (p BlockChange) Packet() []byte {

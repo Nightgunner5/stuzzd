@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func dispatchPacket(p Player, packet protocol.Packet) {
@@ -123,10 +124,8 @@ func starUsername(name string) string {
 
 func sendChunk(p Player, x, z int32, chunk *protocol.Chunk) {
 	if chunk == nil {
-		log.Printf("Unloading chunk at (%d, %d) for %s", x, z, p.Username())
 		p.SendPacket(protocol.ChunkAllocation{X: x, Z: z, Init: false})
 	} else {
-		log.Printf("Sending chunk at (%d, %d) to %s", x, z, p.Username())
 		p.SendPacketSync(protocol.ChunkAllocation{X: x, Z: z, Init: true})
 		p.SendPacketSync(protocol.ChunkData{X: x, Z: z, Chunk: chunk})
 	}
@@ -134,4 +133,10 @@ func sendChunk(p Player, x, z int32, chunk *protocol.Chunk) {
 
 func SaveAllTheThings() {
 	SendToAll(protocol.Kick{Reason: "Server is shutting down!"})
+	chunkLock.Lock()
+	for _, chunk := range chunks {
+		chunk.Save()
+	}
+	chunkLock.Unlock()
+	time.Sleep(time.Second)
 }
