@@ -4,6 +4,7 @@ import (
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"github.com/Nightgunner5/stuzzd/util"
 	"sync"
+	"runtime"
 )
 
 func GetBlockAt(x, y, z int32) protocol.BlockType {
@@ -43,6 +44,7 @@ func loadChunk(chunkX, chunkZ int32) *protocol.Chunk {
 func InitSpawnArea() {
 	for x := int32(-8); x < 8; x++ {
 		for z := int32(-8); z < 8; z++ {
+			runtime.Gosched() // We want to accept connections while we start up, even on GOMAXPROCS=1.
 			GetChunk(x, z).Compressed()
 		}
 	}
