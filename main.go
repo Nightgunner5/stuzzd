@@ -9,7 +9,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"runtime"
 	"runtime/pprof"
 	"syscall"
 	"time"
@@ -22,8 +21,6 @@ const TICK = time.Second / 20
 
 func main() {
 	flag.Parse()
-
-	runtime.GOMAXPROCS(4)
 
 	if *flagCPUProfile != "" {
 		log.Print("Profiling to file ", *flagCPUProfile, " started.")

@@ -123,8 +123,8 @@ func sendChunk(p Player, x, z int32, chunk *protocol.Chunk) {
 		p.SendPacket(protocol.ChunkAllocation{X: x, Z: z, Init: false})
 	} else {
 		log.Printf("Sending chunk at (%d, %d) to %s", x, z, p.Username())
-		p.SendPacket(protocol.ChunkAllocation{X: x, Z: z, Init: true})
-		p.SendPacket(protocol.ChunkData{X: x, Z: z, Chunk: chunk})
+		p.SendPacketSync(protocol.ChunkAllocation{X: x, Z: z, Init: true})
+		p.SendPacketSync(protocol.ChunkData{X: x, Z: z, Chunk: chunk})
 	}
 }
 

@@ -172,6 +172,7 @@ type Player interface {
 	// This function may be called as a new goroutine if the code sending the packet is not
 	// something that should wait for each player.
 	SendPacket(protocol.Packet)
+	SendPacketSync(protocol.Packet)
 
 	Username() string
 
@@ -221,9 +222,11 @@ func (p *player) getLoginToken() uint64 {
 }
 
 func (p *player) SendPacket(packet protocol.Packet) {
-	go func() {
-		p.sendq <- packet
-	}()
+	go p.SendPacketSync(packet)
+}
+
+func (p *player) SendPacketSync(packet protocol.Packet) {
+	p.sendq <- packet
 }
 
 func (p *player) Authenticated() bool {
@@ -238,8 +241,8 @@ func (p *player) SendPosition(x, y, z float64) {
 	defer func() {
 		if recover() != nil {
 			if config.Tick - p.lastStuckTick > 100 {
-				x, z := int32(p.x)>>4, int32(p.z)>>4
-				sendChunk(p, x, z, GetChunk(x, z))
+				X, Z := int32(x)>>4, int32(z)>>4
+				go sendChunk(p, X, Z, GetChunk(X, Z))
 				p.y += 10
 				p.lastStuckTick = config.Tick
 			}

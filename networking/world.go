@@ -32,15 +32,10 @@ func loadChunk(chunkX, chunkZ int32) *protocol.Chunk {
 				chunk.SetBlock(x, y, z, protocol.Dirt)
 			}
 			chunk.SetBlock(x, change2, z, protocol.Grass)
-			chunk.Biomes[x][z] = protocol.Plains
+			chunk.SetBiome(x, z, protocol.Plains)
 		}
 	}
-	for i := range chunk.LightSky[0] {
-		chunk.LightSky[0][i] = 255
-	}
-	for i := range chunk.LightSky {
-		chunk.LightSky[i] = chunk.LightSky[0]
-	}
+	chunk.InitLighting()
 
 	return chunk
 }

@@ -229,32 +229,66 @@ const (
 )
 
 type Chunk struct {
-	Blocks      BlockChunk
-	BlockData   NibbleChunk
-	LightBlock  NibbleChunk
-	LightSky    NibbleChunk
-	Biomes      [16][16]Biome
+	blocks      BlockChunk
+	blockData   NibbleChunk
+	lightBlock  NibbleChunk
+	lightSky    NibbleChunk
+	biomes      [16][16]Biome
 	dirty       bool
 	compressed  []byte
-	compressing sync.RWMutex
+	lock        sync.RWMutex
 }
 
 func (c *Chunk) SetBlock(x, y, z uint8, block BlockType) {
-	c.Blocks.Set(x, y, z, block)
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.blocks.Set(x, y, z, block)
 	c.dirty = true
 }
 
 func (c *Chunk) GetBlock(x, y, z uint8) BlockType {
-	return c.Blocks.Get(x, y, z)
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.blocks.Get(x, y, z)
 }
 
 func (c *Chunk) SetBlockData(x, y, z, data uint8) {
-	c.BlockData.Set(x, y, z, data)
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.blockData.Set(x, y, z, data)
 	c.dirty = true
 }
 
 func (c *Chunk) GetBlockData(x, y, z uint8) uint8 {
-	return c.BlockData.Get(x, y, z)
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.blockData.Get(x, y, z)
+}
+
+func (c *Chunk) SetBiome(x, z uint8, biome Biome) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.biomes[z][x] = biome
+	c.dirty = true
+}
+
+func (c *Chunk) GetBiome(x, z uint8) Biome {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.biomes[z][x]
+}
+
+// TODO: Actual lighting calculations
+func (c *Chunk) InitLighting() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	for i := range c.lightSky[0] {
+		c.lightSky[0][i] = 255
+	}
+	for i := range c.lightSky {
+		c.lightSky[i] = c.lightSky[0]
+	}
+	c.dirty = true
 }
 
 func panicIfError(n int, err error) {
@@ -264,34 +298,34 @@ func panicIfError(n int, err error) {
 }
 
 func (c *Chunk) Compressed() []byte {
-	c.compressing.RLock()
+	c.lock.RLock()
 	if !c.dirty && c.compressed != nil {
-		c.compressing.RUnlock()
+		defer c.lock.RUnlock()
 		return c.compressed
 	}
-	c.compressing.RUnlock()
+	c.lock.RUnlock()
 
-	c.compressing.Lock()
-	defer c.compressing.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	if !c.dirty && c.compressed != nil {
 		return c.compressed
 	}
 	var buf bytes.Buffer
 	w := zlib.NewWriter(&buf)
 
-	for _, blocks := range c.Blocks {
+	for _, blocks := range c.blocks {
 		panicIfError(0, binary.Write(w, binary.BigEndian, blocks))
 	}
-	for _, data := range c.BlockData {
+	for _, data := range c.blockData {
 		panicIfError(w.Write(data[:]))
 	}
-	for _, light := range c.LightBlock {
+	for _, light := range c.lightBlock {
 		panicIfError(w.Write(light[:]))
 	}
-	for _, light := range c.LightSky {
+	for _, light := range c.lightSky {
 		panicIfError(w.Write(light[:]))
 	}
-	for _, biomes := range c.Biomes {
+	for _, biomes := range c.biomes {
 		panicIfError(0, binary.Write(w, binary.BigEndian, biomes))
 	}
 
