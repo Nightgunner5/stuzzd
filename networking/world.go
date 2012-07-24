@@ -54,12 +54,6 @@ var chunks = make(map[uint64]*protocol.Chunk)
 var chunkLock sync.RWMutex
 
 func GetChunkAt(x, z int32) *protocol.Chunk {
-	if x < 0 {
-		x -= 15
-	}
-	if z < 0 {
-		z -= 15
-	}
 	return GetChunk(x>>4, z>>4)
 }
 

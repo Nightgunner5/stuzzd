@@ -28,7 +28,7 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 			p.(*player).authenticated = true
 			OnlinePlayerCount++
 			p.(*player).gameMode = protocol.Survival
-			if p.Username() == "Nightgunner5" || p.Username() == "7031" {
+			if isNetworkAdmin(p) {
 				p.(*player).gameMode = protocol.Creative
 			}
 			p.SendPacket(protocol.LoginRequest{
@@ -44,7 +44,11 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 			p.SetAngles(stored.Rotation[0], stored.Rotation[1])
 			p.sendWorldData()
 			log.Print(p.Username(), " connected.")
-			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s connected.", formatUsername(p.Username()))})
+			if customLoginMessage(p) != "" {
+				SendToAll(protocol.Chat{Message: fmt.Sprintf(customLoginMessage(p), formatUsername(p.Username()))})
+			} else {
+				SendToAll(protocol.Chat{Message: fmt.Sprintf("%s connected.", formatUsername(p.Username()))})
+			}
 			for _, player := range players {
 				if player != p {
 					p.SendPacket(player.makeSpawnPacket())

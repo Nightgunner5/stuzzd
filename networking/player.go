@@ -239,13 +239,13 @@ func (p *player) SendPosition(x, y, z float64) {
 	}
 	p.lastMoveTick = config.Tick
 	defer func() {
-		if recover() != nil {
-			if config.Tick - p.lastStuckTick > 100 {
-				X, Z := int32(x)>>4, int32(z)>>4
-				go sendChunk(p, X, Z, GetChunk(X, Z))
-				p.y += 10
-				p.lastStuckTick = config.Tick
-			}
+		if r := recover(); r != nil {
+			//if r == "inside a block" && config.Tick - p.lastStuckTick > 100 {
+			//	X, Z := int32(x)>>4, int32(z)>>4
+			//	go sendChunk(p, X, Z, GetChunk(X, Z))
+			//	p.y += 10
+			//	p.lastStuckTick = config.Tick
+			//}
 			SendToAllExcept(p, protocol.EntityTeleport{
 				ID:    p.id,
 				X:     p.x,
@@ -258,10 +258,11 @@ func (p *player) SendPosition(x, y, z float64) {
 		}
 	}()
 	if y < 0 {
-		p.y = 256
+		p.y = 128
 		panic("fell out of world")
 	}
-	if block := GetBlockAt(int32(math.Floor(x)), int32(math.Floor(y+0.1)), int32(math.Floor(z))); block != protocol.Air && block != protocol.StationaryWater && block != protocol.Water && block != protocol.StationaryLava && block != protocol.Lava {
+	blockX, blockY, blockZ := int32(math.Floor(x)), int32(math.Floor(y)), int32(math.Floor(z))
+	if block := GetBlockAt(blockX, blockY, blockZ); block != protocol.Air && block != protocol.StationaryWater && block != protocol.Water && block != protocol.StationaryLava && block != protocol.Lava {
 		panic("inside a block")
 	}
 
