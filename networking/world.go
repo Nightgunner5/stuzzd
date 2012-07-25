@@ -130,7 +130,7 @@ func spreadWater(x, y, z int32) bool {
 			change = true
 			continue
 		}
-		if xpos < here - 1 && xpos <= xneg && xpos <= zpos && xpos <= zneg {
+		if xpos < here-1 && xpos <= xneg && xpos <= zpos && xpos <= zneg {
 			xpos++
 			incrementWater(x+1, y, z)
 			here--
@@ -138,7 +138,7 @@ func spreadWater(x, y, z int32) bool {
 			change = true
 			continue
 		}
-		if xneg < here - 1 && xneg <= xpos && xneg <= zpos && xneg <= zneg {
+		if xneg < here-1 && xneg <= xpos && xneg <= zpos && xneg <= zneg {
 			xneg++
 			incrementWater(x-1, y, z)
 			here--
@@ -146,7 +146,7 @@ func spreadWater(x, y, z int32) bool {
 			change = true
 			continue
 		}
-		if zpos < here - 1 && zpos <= xpos && zpos <= xneg && zpos <= zneg {
+		if zpos < here-1 && zpos <= xpos && zpos <= xneg && zpos <= zneg {
 			zpos++
 			incrementWater(x, y, z+1)
 			here--
@@ -154,7 +154,7 @@ func spreadWater(x, y, z int32) bool {
 			change = true
 			continue
 		}
-		if zneg < here - 1 && zneg <= xpos && zneg <= xneg && zneg <= zpos {
+		if zneg < here-1 && zneg <= xpos && zneg <= xneg && zneg <= zpos {
 			zneg++
 			incrementWater(x, y, z-1)
 			here--
@@ -163,6 +163,22 @@ func spreadWater(x, y, z int32) bool {
 			continue
 		}
 		break
+	}
+	// Get rid of the tiny bit of water that stays there forever
+	if here == 1 {
+		if getWaterLevel(x-1, y-1, z) < 8 {
+			incrementWater(x-1, y-1, z)
+			decrementWater(x, y, z)
+		} else if getWaterLevel(x+1, y-1, z) < 8 {
+			incrementWater(x+1, y-1, z)
+			decrementWater(x, y, z)
+		} else if getWaterLevel(x, y-1, z-1) < 8 {
+			incrementWater(x, y-1, z-1)
+			decrementWater(x, y, z)
+		} else if getWaterLevel(x, y-1, z+1) < 8 {
+			incrementWater(x, y-1, z+1)
+			decrementWater(x, y, z)
+		}
 	}
 	return change
 }
@@ -183,7 +199,7 @@ func ticker() {
 			x, y, z := block.x, block.y, block.z
 			switch GetBlockAt(x, y, z) {
 			case protocol.Water:
-				if !spreadWater(x, y, z) {
+				if !spreadWater(x, y, z) && GetBlockAt(x, y, z) == protocol.Water {
 					setBlockNoUpdate(x, y, z, protocol.StationaryWater, GetBlockDataAt(x, y, z))
 				}
 			case protocol.Sponge:
