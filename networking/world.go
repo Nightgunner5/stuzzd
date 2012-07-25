@@ -8,12 +8,20 @@ import (
 	"time"
 )
 
+// Wait a tick before unmarking the chunk to stop it from hitting 0 users over and over during the same tick.
+func unmarkChunkDelayed(chunk *protocol.Chunk) {
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		chunk.MarkUnused()
+	}()
+}
+
 func GetBlockAt(x, y, z int32) protocol.BlockType {
 	if y < 0 || y > 255 {
 		return protocol.Air
 	}
 	chunk := GetChunkAtMark(x, z)
-	defer chunk.MarkUnused()
+	defer unmarkChunkDelayed(chunk)
 	return chunk.GetBlock(uint8(x&0xF), uint8(y), uint8(z&0xF))
 }
 
@@ -22,7 +30,7 @@ func GetBlockDataAt(x, y, z int32) uint8 {
 		return 0
 	}
 	chunk := GetChunkAtMark(x, z)
-	defer chunk.MarkUnused()
+	defer unmarkChunkDelayed(chunk)
 	return chunk.GetBlockData(uint8(x&0xF), uint8(y), uint8(z&0xF))
 }
 
@@ -31,7 +39,7 @@ func SetBlockAt(x, y, z int32, block protocol.BlockType, data uint8) {
 		return
 	}
 	chunk := GetChunkAtMark(x, z)
-	defer chunk.MarkUnused()
+	defer unmarkChunkDelayed(chunk)
 	chunk.SetBlock(uint8(x&0xF), uint8(y), uint8(z&0xF), block)
 	chunk.SetBlockData(uint8(x&0xF), uint8(y), uint8(z&0xF), data)
 	startBlockUpdate(x, y, z)
@@ -43,7 +51,7 @@ func setBlockNoUpdate(x, y, z int32, block protocol.BlockType, data uint8) {
 		return
 	}
 	chunk := GetChunkAtMark(x, z)
-	defer chunk.MarkUnused()
+	defer unmarkChunkDelayed(chunk)
 	chunk.SetBlock(uint8(x&0xF), uint8(y), uint8(z&0xF), block)
 	chunk.SetBlockData(uint8(x&0xF), uint8(y), uint8(z&0xF), data)
 }
@@ -57,6 +65,8 @@ func startBlockUpdate(x, y, z int32) {
 				case protocol.Water, protocol.StationaryWater:
 					chunk.SetBlock(uint8(X&0xF), uint8(Y), uint8(Z&0xF), protocol.Water)
 					queueUpdate(X, Y, Z)
+				case protocol.Sponge:
+					queueUpdate(X, Y, Z)
 				}
 				chunk.MarkUnused()
 			}
@@ -64,53 +74,97 @@ func startBlockUpdate(x, y, z int32) {
 	}
 }
 
-func spreadWater(fromX, fromY, fromZ, toX, toY, toZ int32) bool {
-	fromData := GetBlockDataAt(fromX, fromY, fromZ)
-	if fromData&0x8 == 0x8 && fromY == toY { // This water is falling, don't make it go sideways!
-		return false
+func incrementWater(x, y, z int32) {
+	level := GetBlockDataAt(x, y, z)
+	if block := GetBlockAt(x, y, z); block != protocol.Water && block != protocol.StationaryWater { // No water here yet
+		SetBlockAt(x, y, z, protocol.Water, 0x7)
+		return
 	}
-	if fromData == 0x7 { // No infinite spreading recursion!
+	if level&0x7 == 0x0 { // Already full
+		return
+	}
+	SetBlockAt(x, y, z, protocol.Water, level&0x8|(level&0x7-1)&0x7)
+}
+func decrementWater(x, y, z int32) {
+	level := GetBlockDataAt(x, y, z)
+	if block := GetBlockAt(x, y, z); block != protocol.Water && block != protocol.StationaryWater { // No water here
+		return
+	}
+	if level&0x7 == 0x7 { // No water left
+		SetBlockAt(x, y, z, protocol.Air, 0)
+		return
+	}
+	SetBlockAt(x, y, z, protocol.Water, level&0x8|(level&0x7+1)&0x7)
+}
+
+func getWaterLevel(x, y, z int32) uint8 {
+	block := GetBlockAt(x, y, z)
+	if block == protocol.Water || block == protocol.StationaryWater {
+		return 8 - (GetBlockDataAt(x, y, z) & 0x7)
+	}
+	if block.Passable() {
+		return 0
+	}
+	return ^uint8(0)
+}
+
+func spreadWater(x, y, z int32) bool {
+	here := getWaterLevel(x, y, z)
+	xneg := getWaterLevel(x-1, y, z)
+	xpos := getWaterLevel(x+1, y, z)
+	zneg := getWaterLevel(x, y, z-1)
+	zpos := getWaterLevel(x, y, z+1)
+	down := getWaterLevel(x, y-1, z)
+
+	if here == 0 || here > 8 { // No water here
 		return false
 	}
 
-	toType := GetBlockAt(toX, toY, toZ)
-	if !toType.Passable() {
-		return false
-	}
-	toData := GetBlockDataAt(toX, toY, toZ)
-	if toType != protocol.Water && toType != protocol.StationaryWater {
-		if fromData&0x8 == 0x8 {
-			toData = fromData & ^uint8(0x8)
-			fromData = 0
-		} else {
-			toData = 0x7
-			fromData++
+	change := false
+	for i := 0; i < 8 && here > 0; i++ {
+		if down < 8 {
+			down++
+			incrementWater(x, y-1, z)
+			here--
+			decrementWater(x, y, z)
+			change = true
+			continue
 		}
-		if fromData&0x7 == 0x0 {
-			SetBlockAt(fromX, fromY, fromZ, protocol.Air, 0)
-		} else {
-			SetBlockAt(fromX, fromY, fromZ, protocol.Water, fromData)
+		if xpos < here - 1 && xpos <= xneg && xpos <= zpos && xpos <= zneg {
+			xpos++
+			incrementWater(x+1, y, z)
+			here--
+			decrementWater(x, y, z)
+			change = true
+			continue
 		}
-		SetBlockAt(toX, toY, toZ, protocol.Water, toData)
-		return true
+		if xneg < here - 1 && xneg <= xpos && xneg <= zpos && xneg <= zneg {
+			xneg++
+			incrementWater(x-1, y, z)
+			here--
+			decrementWater(x, y, z)
+			change = true
+			continue
+		}
+		if zpos < here - 1 && zpos <= xpos && zpos <= xneg && zpos <= zneg {
+			zpos++
+			incrementWater(x, y, z+1)
+			here--
+			decrementWater(x, y, z)
+			change = true
+			continue
+		}
+		if zneg < here - 1 && zneg <= xpos && zneg <= xneg && zneg <= zpos {
+			zneg++
+			incrementWater(x, y, z-1)
+			here--
+			decrementWater(x, y, z)
+			change = true
+			continue
+		}
+		break
 	}
-	if toData&0x7 == 0x0 { // Target block is already full.
-		return false
-	}
-
-	if fromData&0x8 == 0x0 && fromData&0x7 == toData&0x7-1 { // Target block is nearly the same height as this block - spreading would cause infinite updates.
-		return false
-	}
-
-	toData = (toData & 0x8) | (toData&0x7 - 1)
-	fromData = (fromData & 0x8) | (fromData&0x7 + 1)
-	if fromData&0x7 == 0x0 {
-		SetBlockAt(fromX, fromY, fromZ, protocol.Air, 0)
-	} else {
-		SetBlockAt(fromX, fromY, fromZ, protocol.Water, fromData)
-	}
-	SetBlockAt(toX, toY, toZ, protocol.Water, toData)
-	return true
+	return change
 }
 
 var updateQueue = make(map[struct{ x, y, z int32 }]bool)
@@ -129,18 +183,18 @@ func ticker() {
 			x, y, z := block.x, block.y, block.z
 			switch GetBlockAt(x, y, z) {
 			case protocol.Water:
-				a := spreadWater(x, y, z, x, y-1, z)
-				b := spreadWater(x, y, z, x-1, y, z)
-				c := spreadWater(x, y, z, x+1, y, z)
-				d := spreadWater(x, y, z, x, y, z-1)
-				e := spreadWater(x, y, z, x, y, z+1)
-				if !a && !b && !c && !d && !e {
+				if !spreadWater(x, y, z) {
 					setBlockNoUpdate(x, y, z, protocol.StationaryWater, GetBlockDataAt(x, y, z))
-				} else {
-					updateCount++
+				}
+			case protocol.Sponge:
+				switch GetBlockAt(x, y+1, z) {
+				case protocol.Water, protocol.StationaryWater:
+					decrementWater(x, y+1, z)
 				}
 			}
+			updateCount++
 			delete(updateQueue, block)
+			runtime.Gosched() // Don't cause too much lag
 			if updateCount >= 1000 {
 				log.Print("> 1000 updates. Waiting for the next tick to resume updating.")
 				break

@@ -54,6 +54,12 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 			} else {
 				SendToAll(protocol.Chat{Message: fmt.Sprintf("%s connected.", formatUsername(p))})
 			}
+			for _, player := range players {
+				if player.Authenticated() && player != p {
+					// Spawn them for the new guy
+					p.SendPacketSync(player.makeSpawnPacket())
+				}
+			}
 			SendToAllExcept(p, p.makeSpawnPacket())
 		} else {
 			p.SendPacketSync(protocol.Kick{Reason: "Failed to verify username!"})

@@ -29,6 +29,9 @@ func ChunkGen(chunkX, chunkZ int32) *protocol.Chunk {
 			change1 := uint8(40 + 4*util.Noise2(fx, fz))
 			change2 := uint8(58 + 8*util.Noise2(fx/10, fz/10))
 			river := uint8(river(util.Noise2(fx/4, fz/4)))
+			if x == 0 || x == 15 || z == 0 || z == 15 {
+				river = 0
+			}
 
 			for y := uint8(1); y < change1; y++ {
 				chunk.SetBlock(x, y, z, protocol.Stone)

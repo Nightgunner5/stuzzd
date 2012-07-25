@@ -249,7 +249,7 @@ type Chunk struct {
 	compressed       []byte
 	lock             sync.RWMutex
 	users            int64
-	interruptRecycle chan<- bool
+	interruptRecycle <-chan bool
 }
 
 func (c *Chunk) SetBlock(x, y, z uint8, block BlockType) {
@@ -367,7 +367,7 @@ func (c *Chunk) Compressed() []byte {
 func (c *Chunk) MarkUsed() {
 	atomic.AddInt64(&c.users, 1)
 	if c.interruptRecycle != nil {
-		c.interruptRecycle <- true
+		<-c.interruptRecycle
 		c.interruptRecycle = nil
 	}
 }
@@ -376,14 +376,12 @@ func (c *Chunk) MarkUnused() {
 	users := atomic.AddInt64(&c.users, -1)
 	if users == 0 {
 		interrupt := make(chan bool, 1)
+		interrupt <- false
 		c.interruptRecycle = interrupt
 		go func() {
-			select {
-			case <-interrupt:
-				return
-			case <-time.After(30 * time.Second):
-				RecycleChunk(c)
-			}
+			time.Sleep(30 * time.Second)
+			<-interrupt
+			RecycleChunk(c)
 		}()
 	}
 	if users < 0 {
