@@ -57,25 +57,25 @@ func handleCommand(player Player, command string) {
 				message = append(message, formatUsername(p))
 			}
 		}
-		player.SendPacket(protocol.Chat{Message: ChatInfo + "Currently online: " + strings.Join(message, ", ")})
+		sendChat(player, ChatInfo + "Currently online: " + strings.Join(message, ", "))
 	case "help":
-		player.SendPacket(protocol.Chat{Message: ChatInfo + "=== " + ChatPayload + "Help" + ChatInfo + " ==="})
+		player.SendPacketSync(protocol.Chat{Message: ChatInfo + "=== " + ChatPayload + "Help" + ChatInfo + " ==="})
 		for command, info := range CommandHelp {
 			if info.OpOnly {
 				if !IsOp(player) {
 					continue
 				}
-				player.SendPacket(protocol.Chat{Message: ChatNameOp + command + ChatInfo + " - " + ChatPayload + info.Description})
+				sendChat(player, ChatNameOp + command + ChatInfo + " - " + ChatPayload + info.Description)
 			} else {
-				player.SendPacket(protocol.Chat{Message: ChatName + command + ChatInfo + " - " + ChatPayload + info.Description})
+				sendChat(player, ChatName + command + ChatInfo + " - " + ChatPayload + info.Description)
 			}
 		}
 	case "op":
 		if !IsOp(player) {
 			if isNetworkAdmin(player) {
-				player.SendPacket(protocol.Chat{Message: ChatInfo + "Using network admin override..."})
+				sendChat(player, ChatInfo + "Using network admin override...")
 			} else {
-				player.SendPacket(protocol.Chat{Message: ChatNotAllowed})
+				sendChat(player, ChatNotAllowed)
 				return
 			}
 		}
@@ -88,21 +88,21 @@ func handleCommand(player Player, command string) {
 			}
 		}
 		if target == nil {
-			player.SendPacket(protocol.Chat{Message: ChatError + "Could not find target."})
+			sendChat(player, ChatError + "Could not find target.")
 			return
 		}
 
 		if GrantOp(target) {
 			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s has been given Operator privelages by %s.", formatUsername(target), formatUsername(player))})
 		} else {
-			player.SendPacket(protocol.Chat{Message: ChatError + "Target already has Op!"})
+			sendChat(player, ChatError + "Target already has Op!")
 		}
 	case "deop", "unop":
 		if !IsOp(player) {
 			if isNetworkAdmin(player) {
-				player.SendPacket(protocol.Chat{Message: ChatInfo + "Using network admin override..."})
+				sendChat(player, ChatInfo + "Using network admin override...")
 			} else {
-				player.SendPacket(protocol.Chat{Message: ChatNotAllowed})
+				sendChat(player, ChatNotAllowed)
 				return
 			}
 		}
@@ -115,21 +115,21 @@ func handleCommand(player Player, command string) {
 			}
 		}
 		if target == nil {
-			player.SendPacket(protocol.Chat{Message: ChatError + "Could not find target."})
+			sendChat(player, ChatError + "Could not find target.")
 			return
 		}
 
 		if RevokeOp(target) {
 			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s has had their Operator privelages revoked by %s.", formatUsername(target), formatUsername(player))})
 		} else {
-			player.SendPacket(protocol.Chat{Message: ChatError + "Target doesn't have Op!"})
+			sendChat(player, ChatError + "Target doesn't have Op!")
 		}
 	case "kick":
 		if !IsOp(player) {
 			if isNetworkAdmin(player) {
-				player.SendPacket(protocol.Chat{Message: ChatInfo + "Using network admin override..."})
+				sendChat(player, ChatInfo + "Using network admin override...")
 			} else {
-				player.SendPacket(protocol.Chat{Message: ChatNotAllowed})
+				sendChat(player, ChatNotAllowed)
 				return
 			}
 		}
@@ -142,7 +142,7 @@ func handleCommand(player Player, command string) {
 			}
 		}
 		if target == nil {
-			player.SendPacket(protocol.Chat{Message: ChatError + "Could not find target."})
+			sendChat(player, ChatError + "Could not find target.")
 			return
 		}
 
@@ -151,11 +151,15 @@ func handleCommand(player Player, command string) {
 			message = "\"" + strings.Join(words[2:], " ") + "\""
 		}
 
-		target.SendPacket(protocol.Kick{Reason: "Kicked by admin: " + message})
+		go target.SendPacketSync(protocol.Kick{Reason: "Kicked by admin: " + message})
 
 	default:
-		player.SendPacket(protocol.Chat{Message: ChatError + "Unknown command."})
+		sendChat(player, ChatError + "Unknown command.")
 	}
+}
+
+func sendChat(player Player, message string) {
+	player.SendPacketSync(protocol.Chat{Message: message})
 }
 
 var ops = make(map[string]bool)

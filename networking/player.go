@@ -22,6 +22,7 @@ func HandlePlayer(conn net.Conn) Player {
 	p.id = assignID()
 	p.chunkSet = make(map[uint64]*protocol.Chunk)
 	p.sendq = make(chan protocol.Packet)
+
 	go func() {
 		defer func() {
 			err := recover()
@@ -60,12 +61,12 @@ func HandlePlayer(conn net.Conn) Player {
 					sendHTTPResponse(conn)
 					return
 				}
-				dispatchPacket(p, packet)
+				go dispatchPacket(p, packet)
 				if _, ok := packet.(protocol.Kick); ok {
 					return
 				}
 			case <-sendKeepAlive:
-				p.SendPacket(protocol.KeepAlive{7031})
+				go p.SendPacketSync(protocol.KeepAlive{7031})
 				//case <-timeoutKeepAlive:
 				//	panic("Connection timed out")
 			}
@@ -118,7 +119,7 @@ func recv(p Player, in io.Reader, recvq chan<- protocol.Packet) {
 	defer func() {
 		err := recover()
 		if err != nil {
-			p.SendPacket(protocol.Kick{fmt.Sprint("Error: ", err)})
+			p.SendPacketSync(protocol.Kick{fmt.Sprint("Error: ", err)})
 		}
 	}()
 	id := make([]byte, 1)
@@ -173,7 +174,7 @@ type Player interface {
 	// Adds a packet to the send queue for a player.
 	// This function may be called as a new goroutine if the code sending the packet is not
 	// something that should wait for each player.
-	SendPacket(protocol.Packet)
+	//SendPacket(protocol.Packet)
 	SendPacketSync(protocol.Packet)
 
 	Username() string
@@ -206,9 +207,9 @@ type player struct {
 	pitch, yaw    float32 // radians, not degrees (!)
 	movecounter   uint8
 	lastMoveTick  uint64
-	lastStuckTick uint64
 	gameMode      protocol.ServerMode
 	chunkSet      map[uint64]*protocol.Chunk
+	spawned       bool
 }
 
 func (p *player) setUsername(username string) {
@@ -224,9 +225,9 @@ func (p *player) getLoginToken() uint64 {
 	return p.logintoken
 }
 
-func (p *player) SendPacket(packet protocol.Packet) {
-	go p.SendPacketSync(packet)
-}
+//func (p *player) SendPacket(packet protocol.Packet) {
+//	go p.SendPacketSync(packet)
+//}
 
 func (p *player) SendPacketSync(packet protocol.Packet) {
 	p.sendq <- packet
@@ -237,18 +238,15 @@ func (p *player) Authenticated() bool {
 }
 
 func (p *player) SendPosition(x, y, z float64) {
+	if !p.spawned {
+		return
+	}
 	if p.lastMoveTick == config.Tick {
 		return
 	}
 	p.lastMoveTick = config.Tick
 	defer func() {
 		if r := recover(); r != nil {
-			//if r == "inside a block" && config.Tick - p.lastStuckTick > 100 {
-			//	X, Z := int32(x)>>4, int32(z)>>4
-			//	go sendChunk(p, X, Z, GetChunk(X, Z))
-			//	p.y += 10
-			//	p.lastStuckTick = config.Tick
-			//}
 			SendToAllExcept(p, protocol.EntityTeleport{
 				ID:    p.id,
 				X:     p.x,
@@ -257,7 +255,7 @@ func (p *player) SendPosition(x, y, z float64) {
 				Yaw:   p.yaw,
 				Pitch: p.pitch,
 			})
-			p.SendPacket(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 1.1, Y2: p.y + 0.1, Z: p.z, Yaw: deg(p.yaw), Pitch: deg(p.pitch)})
+			p.SendPacketSync(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 1.2, Y2: p.y + 0.2, Z: p.z, Yaw: deg(p.yaw), Pitch: deg(p.pitch)})
 		}
 	}()
 	if y < 0 {
@@ -294,7 +292,6 @@ func (p *player) SendPosition(x, y, z float64) {
 
 func (p *player) sendWorldData() {
 	go func() {
-		spawned := false
 		for {
 			for i, chunk := range p.chunkSet {
 				x, z := int32(i>>32), int32(i)
@@ -305,20 +302,24 @@ func (p *player) sendWorldData() {
 					delete(p.chunkSet, i)
 				}
 			}
-			middleX, middleZ := int32(p.x/16), int32(p.z/16)
-			for x := middleX - 8; x < middleX+8; x++ {
-				for z := middleZ - 8; z < middleZ+8; z++ {
-					i := uint64(uint32(x))<<32 | uint64(uint32(z))
-					if _, ok := p.chunkSet[i]; !ok {
-						p.chunkSet[i] = GetChunkMark(x, z)
-						sendChunk(p, x, z, p.chunkSet[i])
-						runtime.Gosched()
+
+			for i := int32(1); i <= 4; i++ {
+				middleX, middleZ := int32(p.x/16), int32(p.z/16)
+				for x := middleX - i; x < middleX+i; x++ {
+					for z := middleZ - i; z < middleZ+i; z++ {
+						id := uint64(uint32(x))<<32 | uint64(uint32(z))
+						if _, ok := p.chunkSet[id]; !ok {
+							p.chunkSet[id] = GetChunkMark(x, z)
+							sendChunk(p, x, z, p.chunkSet[id])
+							runtime.Gosched()
+						}
 					}
 				}
-			}
-			if !spawned {
-				p.sendSpawnPacket()
-				spawned = true
+
+				if i == 2 && !p.spawned {
+					p.sendSpawnPacket()
+					p.spawned = true
+				}
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -352,7 +353,7 @@ func (p *player) makeSpawnPacket() protocol.SpawnNamedEntity {
 }
 
 func (p *player) sendSpawnPacket() {
-	p.SendPacket(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 2, Y2: p.y + 3, Z: p.z, Ground: true, Yaw: p.yaw, Pitch: p.pitch})
+	p.SendPacketSync(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 2, Y2: p.y + 3, Z: p.z, Ground: true, Yaw: p.yaw, Pitch: p.pitch})
 }
 
 func sendPacket(p Player, conn net.Conn, packet protocol.Packet) {
@@ -383,7 +384,7 @@ func safeSendPacket(p Player, conn net.Conn, packet protocol.Packet) {
 func SendToAll(packet protocol.Packet) {
 	for _, player := range players {
 		if player.Authenticated() {
-			player.SendPacket(packet)
+			go player.SendPacketSync(packet)
 		}
 	}
 }
@@ -394,7 +395,7 @@ func SendToAllExcept(exclude Player, packet protocol.Packet) {
 			continue
 		}
 		if player.Authenticated() {
-			player.SendPacket(packet)
+			go player.SendPacketSync(packet)
 		}
 	}
 }

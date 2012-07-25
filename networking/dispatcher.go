@@ -27,18 +27,22 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 		req.Body.Read(buf)
 		if string(buf) == "YES" {
 			p.(*player).authenticated = true
+			if OnlinePlayerCount >= config.NumSlots {
+				p.SendPacketSync(protocol.Kick{Reason: "Server is full!"})
+				return
+			}
 			OnlinePlayerCount++
 			p.(*player).gameMode = protocol.Survival
 			if isNetworkAdmin(p) {
 				p.(*player).gameMode = protocol.Creative
 			}
-			p.SendPacket(protocol.LoginRequest{
+			p.SendPacketSync(protocol.LoginRequest{
 				EntityID:   p.ID(),
 				LevelType:  "default",
 				ServerMode: p.(*player).gameMode,
 				Dimension:  protocol.Overworld,
 				Difficulty: protocol.Peaceful,
-				MaxPlayers: config.NumSlots(),
+				MaxPlayers: config.NumSlots,
 			})
 			stored := storage.GetPlayer(p.Username())
 			p.SetPosition(stored.Position[0], stored.Position[1], stored.Position[2])
@@ -50,14 +54,9 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 			} else {
 				SendToAll(protocol.Chat{Message: fmt.Sprintf("%s connected.", formatUsername(p))})
 			}
-			for _, player := range players {
-				if player != p {
-					p.SendPacket(player.makeSpawnPacket())
-				}
-			}
 			SendToAllExcept(p, p.makeSpawnPacket())
 		} else {
-			p.SendPacket(protocol.Kick{Reason: "Failed to verify username!"})
+			p.SendPacketSync(protocol.Kick{Reason: "Failed to verify username!"})
 		}
 	case protocol.Chat:
 		if pkt.Message[0] == '/' {
@@ -69,7 +68,7 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 	case protocol.Handshake:
 		data := strings.Split(pkt.Data, ";")
 		p.setUsername(data[0])
-		p.SendPacket(protocol.Handshake{fmt.Sprintf("%016x", p.getLoginToken())})
+		p.SendPacketSync(protocol.Handshake{fmt.Sprintf("%016x", p.getLoginToken())})
 	case protocol.Flying:
 		// TODO
 	case protocol.PlayerPosition:
@@ -101,7 +100,7 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 	case protocol.PlayerAbilities:
 		// TODO
 	case protocol.ServerListPing:
-		p.SendPacket(protocol.Kick{Reason: fmt.Sprintf("%s§%d§%d", config.ServerDescription(), OnlinePlayerCount, config.NumSlots())})
+		p.SendPacketSync(protocol.Kick{Reason: fmt.Sprintf("%s§%d§%d", config.ServerDescription(), OnlinePlayerCount, config.NumSlots)})
 	case protocol.Kick:
 		log.Print(p.Username(), " disconnected.")
 		SendToAll(protocol.Chat{Message: fmt.Sprintf("%s disconnected.", formatUsername(p))})
@@ -112,7 +111,7 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 
 func sendChunk(p Player, x, z int32, chunk *protocol.Chunk) {
 	if chunk == nil {
-		p.SendPacket(protocol.ChunkAllocation{X: x, Z: z, Init: false})
+		p.SendPacketSync(protocol.ChunkAllocation{X: x, Z: z, Init: false})
 	} else {
 		p.SendPacketSync(protocol.ChunkAllocation{X: x, Z: z, Init: true})
 		p.SendPacketSync(protocol.ChunkData{X: x, Z: z, Chunk: chunk})

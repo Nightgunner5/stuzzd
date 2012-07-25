@@ -2,7 +2,6 @@ package networking
 
 import (
 	"github.com/Nightgunner5/stuzzd/protocol"
-	"github.com/Nightgunner5/stuzzd/util"
 	"runtime"
 	"sync"
 )
@@ -19,26 +18,7 @@ func SetBlockAt(x, y, z int32, block protocol.BlockType, data uint8) {
 }
 
 func loadChunk(chunkX, chunkZ int32) *protocol.Chunk {
-	chunk := new(protocol.Chunk)
-
-	for x := uint8(0); x < 16; x++ {
-		for z := uint8(0); z < 16; z++ {
-			chunk.SetBlock(x, 0, z, protocol.Bedrock)
-			change1 := uint8(40 + 4*util.Noise2(float64(x)/16+float64(chunkX), float64(z)/16+float64(chunkZ)))
-			change2 := uint8(58 + 8*util.Noise2((float64(x)/16+float64(chunkX))/10, (float64(z)/16+float64(chunkZ))/10))
-			for y := uint8(1); y < change1; y++ {
-				chunk.SetBlock(x, y, z, protocol.Stone)
-			}
-			for y := change1; y < change2; y++ {
-				chunk.SetBlock(x, y, z, protocol.Dirt)
-			}
-			chunk.SetBlock(x, change2, z, protocol.Grass)
-			chunk.SetBiome(x, z, protocol.Plains)
-		}
-	}
-	chunk.InitLighting()
-
-	return chunk
+	return ChunkGen(chunkX, chunkZ)
 }
 
 func InitSpawnArea() {
@@ -47,7 +27,7 @@ func InitSpawnArea() {
 			runtime.Gosched() // We want to accept connections while we start up, even on GOMAXPROCS=1.
 			chunk := GetChunkMark(x, z)
 			chunk.Compressed()
-			chunk.MarkUnused()
+			// Don't release the chunks so connecting the game will be faster for new players.
 		}
 	}
 }

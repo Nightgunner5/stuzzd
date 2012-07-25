@@ -286,16 +286,27 @@ func (c *Chunk) GetBiome(x, z uint8) Biome {
 	return c.biomes[z][x]
 }
 
-// TODO: Actual lighting calculations
 func (c *Chunk) InitLighting() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	for i := range c.lightSky[0] {
-		c.lightSky[0][i] = 255
+
+	for x := uint8(0); x < 16; x++ {
+		for z := uint8(0); z < 16; z++ {
+			brightness := uint8(15)
+			for y := uint8(255); y >= 0 && brightness > 0; y-- {
+				c.lightSky.Set(x, y, z, brightness)
+				switch c.blocks.Get(x, y, z) { // Skip the lock
+				case Air, Glass:
+					// Don't change the brightness
+				case Water, StationaryWater:
+					brightness--
+				default:
+					brightness = 0
+				}
+			}
+		}
 	}
-	for i := range c.lightSky {
-		c.lightSky[i] = c.lightSky[0]
-	}
+
 	c.dirty = true
 	c.needsSave = true
 }

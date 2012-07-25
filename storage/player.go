@@ -69,7 +69,7 @@ type Player struct {
 
 func (p *Player) defaults() {
 	p.Motion = []float64{0, 0, 0}
-	p.Position = []float64{8.5, 70, 8.5}
+	p.Position = []float64{8.5, 60, 8.5}
 	p.Rotation = []float32{0, 0}
 }
 
