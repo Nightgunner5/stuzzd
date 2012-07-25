@@ -2,17 +2,8 @@ package networking
 
 import (
 	"github.com/Nightgunner5/stuzzd/protocol"
-	"math"
 	"sync"
 )
-
-func deg(in float32) float32 {
-	return in / math.Pi * 180
-}
-
-func rad(in float32) float32 {
-	return in * math.Pi / 180
-}
 
 type Entity interface {
 	ID() uint32

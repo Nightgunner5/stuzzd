@@ -185,6 +185,7 @@ type Player interface {
 	SetPosition(x, y, z float64)
 	// Sets the position and sends the offset to all online players.
 	SendPosition(x, y, z float64)
+	ForcePosition()
 
 	Angles() (yaw, pitch float32)
 	SetAngles(yaw, pitch float32)
@@ -204,7 +205,7 @@ type player struct {
 	authenticated bool
 	sendq         chan protocol.Packet
 	x, y, z       float64
-	pitch, yaw    float32 // radians, not degrees (!)
+	pitch, yaw    float32
 	movecounter   uint8
 	lastMoveTick  uint64
 	gameMode      protocol.ServerMode
@@ -246,16 +247,8 @@ func (p *player) SendPosition(x, y, z float64) {
 	}
 	p.lastMoveTick = config.Tick
 	defer func() {
-		if r := recover(); r != nil {
-			SendToAllExcept(p, protocol.EntityTeleport{
-				ID:    p.id,
-				X:     p.x,
-				Y:     p.y,
-				Z:     p.z,
-				Yaw:   p.yaw,
-				Pitch: p.pitch,
-			})
-			p.SendPacketSync(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 1.2, Y2: p.y + 0.2, Z: p.z, Yaw: deg(p.yaw), Pitch: deg(p.pitch)})
+		if recover() != nil {
+			p.ForcePosition()
 		}
 	}()
 	if y < 0 {
@@ -288,6 +281,19 @@ func (p *player) SendPosition(x, y, z float64) {
 		})
 		p.movecounter = 0
 	}
+}
+
+func (p *player) ForcePosition() {
+	SendToAllExcept(p, protocol.EntityTeleport{
+		ID:    p.id,
+		X:     p.x,
+		Y:     p.y,
+		Z:     p.z,
+		Yaw:   p.yaw,
+		Pitch: p.pitch,
+	})
+	p.SendPacketSync(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 1.2, Y2: p.y + 0.2, Z: p.z, Yaw: p.yaw, Pitch: p.pitch})
+
 }
 
 func (p *player) sendWorldData() {

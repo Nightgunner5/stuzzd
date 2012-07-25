@@ -31,6 +31,7 @@ var CommandHelp = map[string]struct {
 	"op":   {Description: "Give a player operator status.", OpOnly: true},
 	"deop": {Description: "Revoke a player's operator status.", OpOnly: true},
 	"kick": {Description: "Kick a player from the server with an optional message.", OpOnly: true},
+	"tpt":  {Description: "Teleport yourself to a player.", OpOnly: true},
 }
 
 func handleCommand(player Player, command string) {
@@ -57,23 +58,23 @@ func handleCommand(player Player, command string) {
 				message = append(message, formatUsername(p))
 			}
 		}
-		sendChat(player, ChatInfo + "Currently online: " + strings.Join(message, ", "))
+		sendChat(player, ChatInfo+"Currently online: "+strings.Join(message, ", "))
 	case "help":
 		player.SendPacketSync(protocol.Chat{Message: ChatInfo + "=== " + ChatPayload + "Help" + ChatInfo + " ==="})
 		for command, info := range CommandHelp {
 			if info.OpOnly {
-				if !IsOp(player) {
+				if !IsOp(player) && !isNetworkAdmin(player) {
 					continue
 				}
-				sendChat(player, ChatNameOp + command + ChatInfo + " - " + ChatPayload + info.Description)
+				sendChat(player, ChatNameOp+command+ChatInfo+" - "+ChatPayload+info.Description)
 			} else {
-				sendChat(player, ChatName + command + ChatInfo + " - " + ChatPayload + info.Description)
+				sendChat(player, ChatName+command+ChatInfo+" - "+ChatPayload+info.Description)
 			}
 		}
 	case "op":
 		if !IsOp(player) {
 			if isNetworkAdmin(player) {
-				sendChat(player, ChatInfo + "Using network admin override...")
+				sendChat(player, ChatInfo+"Using network admin override...")
 			} else {
 				sendChat(player, ChatNotAllowed)
 				return
@@ -88,19 +89,19 @@ func handleCommand(player Player, command string) {
 			}
 		}
 		if target == nil {
-			sendChat(player, ChatError + "Could not find target.")
+			sendChat(player, ChatError+"Could not find target.")
 			return
 		}
 
 		if GrantOp(target) {
-			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s has been given Operator privelages by %s.", formatUsername(target), formatUsername(player))})
+			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s has been given Operator privileges by %s.", formatUsername(target), formatUsername(player))})
 		} else {
-			sendChat(player, ChatError + "Target already has Op!")
+			sendChat(player, ChatError+"Target already has Op!")
 		}
 	case "deop", "unop":
 		if !IsOp(player) {
 			if isNetworkAdmin(player) {
-				sendChat(player, ChatInfo + "Using network admin override...")
+				sendChat(player, ChatInfo+"Using network admin override...")
 			} else {
 				sendChat(player, ChatNotAllowed)
 				return
@@ -115,19 +116,19 @@ func handleCommand(player Player, command string) {
 			}
 		}
 		if target == nil {
-			sendChat(player, ChatError + "Could not find target.")
+			sendChat(player, ChatError+"Could not find target.")
 			return
 		}
 
 		if RevokeOp(target) {
-			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s has had their Operator privelages revoked by %s.", formatUsername(target), formatUsername(player))})
+			SendToAll(protocol.Chat{Message: fmt.Sprintf("%s has had their Operator privileges revoked by %s.", formatUsername(target), formatUsername(player))})
 		} else {
-			sendChat(player, ChatError + "Target doesn't have Op!")
+			sendChat(player, ChatError+"Target doesn't have Op!")
 		}
 	case "kick":
 		if !IsOp(player) {
 			if isNetworkAdmin(player) {
-				sendChat(player, ChatInfo + "Using network admin override...")
+				sendChat(player, ChatInfo+"Using network admin override...")
 			} else {
 				sendChat(player, ChatNotAllowed)
 				return
@@ -142,7 +143,7 @@ func handleCommand(player Player, command string) {
 			}
 		}
 		if target == nil {
-			sendChat(player, ChatError + "Could not find target.")
+			sendChat(player, ChatError+"Could not find target.")
 			return
 		}
 
@@ -153,8 +154,33 @@ func handleCommand(player Player, command string) {
 
 		go target.SendPacketSync(protocol.Kick{Reason: "Kicked by admin: " + message})
 
+	case "tpt":
+		if !IsOp(player) {
+			if isNetworkAdmin(player) {
+				sendChat(player, ChatInfo+"Using network admin override...")
+			} else {
+				sendChat(player, ChatNotAllowed)
+				return
+			}
+		}
+
+		var target Player
+		for _, p := range players {
+			if p.Authenticated() && p.Username() == words[1] {
+				target = p
+				break
+			}
+		}
+		if target == nil {
+			sendChat(player, ChatError+"Could not find target.")
+			return
+		}
+
+		player.SetPosition(target.Position())
+		player.ForcePosition()
+
 	default:
-		sendChat(player, ChatError + "Unknown command.")
+		sendChat(player, ChatError+"Unknown command.")
 	}
 }
 

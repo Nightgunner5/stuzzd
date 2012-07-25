@@ -75,9 +75,9 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 		p.SendPosition(pkt.X, pkt.Y1, pkt.Z)
 		// TODO: validation
 	case protocol.PlayerLook:
-		p.SendAngles(rad(pkt.Yaw), rad(pkt.Pitch))
+		p.SendAngles(pkt.Yaw, pkt.Pitch)
 	case protocol.PlayerPositionLook:
-		p.SendAngles(rad(pkt.Yaw), rad(pkt.Pitch))
+		p.SendAngles(pkt.Yaw, pkt.Pitch)
 		p.SendPosition(pkt.X, pkt.Y1, pkt.Z)
 		// TODO: validation
 	case protocol.PlayerDigging:
