@@ -43,14 +43,14 @@ const (
 	DETECTOR_RAIL                      = 28
 	PISTON_STICKY_BASE                 = 29
 	WEB                                = 30
-	LONG_GRASS                         = 31
+	LongGrass                BlockType = 31
 	DEAD_BUSH                          = 32
 	PISTON_BASE                        = 33
 	PISTON_EXTENSION                   = 34
 	Wool                     BlockType = 35
 	PistonMovingPiece        BlockType = 36
-	YELLOW_FLOWER                      = 37
-	RED_ROSE                           = 38
+	YellowFlower             BlockType = 37
+	RedFlower                BlockType = 38
 	BROWN_MUSHROOM                     = 39
 	RED_MUSHROOM                       = 40
 	GOLD_BLOCK                         = 41
@@ -138,6 +138,14 @@ const (
 	RedstoneLampOff          BlockType = 123
 	RedstoneLampOn           BlockType = 124
 )
+
+func (b BlockType) Passable() bool {
+	switch b {
+	case Air, Water, StationaryWater, Lava, StationaryLava, LongGrass, RedFlower, YellowFlower:
+		return true
+	}
+	return false
+}
 
 type BlockSection [4096]BlockType
 

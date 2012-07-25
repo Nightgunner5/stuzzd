@@ -51,6 +51,19 @@ func ChunkGen(chunkX, chunkZ int32) *protocol.Chunk {
 
 			if river == 0 || change2 > 50 {
 				chunk.SetBlock(x, change2, z, protocol.Grass)
+				if r.Intn(3) == 0 {
+					if r.Intn(8) == 0 {
+						fy := float64(change2 + 1)
+						if util.Noise3(fx/2, fy/2, fz/2) > 0 {
+							chunk.SetBlock(x, change2+1, z, protocol.RedFlower)
+						} else {
+							chunk.SetBlock(x, change2+1, z, protocol.YellowFlower)
+						}
+					} else {
+						chunk.SetBlock(x, change2+1, z, protocol.LongGrass)
+						chunk.SetBlockData(x, change2+1, z, 1)
+					}
+				}
 				chunk.SetBiome(x, z, protocol.Plains)
 			} else {
 				chunk.SetBiome(x, z, protocol.River)
