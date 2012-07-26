@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"math"
 	"strings"
 )
 
@@ -77,7 +76,7 @@ func decodeDouble(in io.Reader) float64 {
 }
 
 func encodeAngle(a float32, out io.Writer) {
-	out.Write([]byte{uint8(a / math.Pi * 128)})
+	out.Write([]byte{uint8(a / 180 * 128)})
 }
 
 // Keep Alive (0x00)
@@ -567,6 +566,23 @@ func (p ChunkData) Packet() []byte {
 }
 
 // No read function as this is not sent by the client.
+
+// Block Change (0x34)
+type MultiBlockChange struct {
+	X, Z   int32
+	Blocks []uint32
+}
+
+func (p MultiBlockChange) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0x34))
+	binary.Write(&buf, binary.BigEndian, p.X)
+	binary.Write(&buf, binary.BigEndian, p.Z)
+	binary.Write(&buf, binary.BigEndian, uint16(len(p.Blocks)))
+	binary.Write(&buf, binary.BigEndian, uint32(len(p.Blocks))*4)
+	binary.Write(&buf, binary.BigEndian, p.Blocks)
+	return buf.Bytes()
+}
 
 // Block Change (0x35)
 type BlockChange struct {

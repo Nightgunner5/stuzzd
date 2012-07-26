@@ -192,6 +192,8 @@ type Player interface {
 	// Sets the angles and sends them to all online players.
 	SendAngles(yaw, pitch float32)
 
+	SetGameMode(protocol.ServerMode)
+
 	makeSpawnPacket() protocol.SpawnNamedEntity
 	sendWorldData()
 	setUsername(string)
@@ -352,6 +354,15 @@ func (p *player) SetAngles(yaw, pitch float32) {
 
 func (p *player) Angles() (yaw, pitch float32) {
 	return p.yaw, p.pitch
+}
+
+func (p *player) SetGameMode(mode protocol.ServerMode) {
+	p.gameMode = mode
+	p.SendPacketSync(protocol.PlayerAbilities{
+		Invulnerable:   mode == protocol.Creative,
+		CanFly:         mode == protocol.Creative,
+		InstantDestroy: mode == protocol.Creative,
+	})
 }
 
 func (p *player) makeSpawnPacket() protocol.SpawnNamedEntity {

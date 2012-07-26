@@ -34,6 +34,7 @@ func main() {
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
+
 	go networking.InitSpawnArea()
 
 	ln, err := net.Listen("tcp", *flagHostPort)

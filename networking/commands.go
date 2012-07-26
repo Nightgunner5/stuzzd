@@ -72,13 +72,8 @@ func handleCommand(player Player, command string) {
 			}
 		}
 	case "op":
-		if !IsOp(player) {
-			if isNetworkAdmin(player) {
-				sendChat(player, ChatInfo+"Using network admin override...")
-			} else {
-				sendChat(player, ChatNotAllowed)
-				return
-			}
+		if !checkOp(player) {
+			return
 		}
 
 		var target Player
@@ -99,13 +94,8 @@ func handleCommand(player Player, command string) {
 			sendChat(player, ChatError+"Target already has Op!")
 		}
 	case "deop", "unop":
-		if !IsOp(player) {
-			if isNetworkAdmin(player) {
-				sendChat(player, ChatInfo+"Using network admin override...")
-			} else {
-				sendChat(player, ChatNotAllowed)
-				return
-			}
+		if !checkOp(player) {
+			return
 		}
 
 		var target Player
@@ -126,13 +116,8 @@ func handleCommand(player Player, command string) {
 			sendChat(player, ChatError+"Target doesn't have Op!")
 		}
 	case "kick":
-		if !IsOp(player) {
-			if isNetworkAdmin(player) {
-				sendChat(player, ChatInfo+"Using network admin override...")
-			} else {
-				sendChat(player, ChatNotAllowed)
-				return
-			}
+		if !checkOp(player) {
+			return
 		}
 
 		var target Player
@@ -155,13 +140,8 @@ func handleCommand(player Player, command string) {
 		go target.SendPacketSync(protocol.Kick{Reason: "Kicked by admin: " + message})
 
 	case "tpt":
-		if !IsOp(player) {
-			if isNetworkAdmin(player) {
-				sendChat(player, ChatInfo+"Using network admin override...")
-			} else {
-				sendChat(player, ChatNotAllowed)
-				return
-			}
+		if !checkOp(player) {
+			return
 		}
 
 		var target Player
@@ -179,9 +159,51 @@ func handleCommand(player Player, command string) {
 		player.SetPosition(target.Position())
 		player.ForcePosition()
 
+	case "gm", "gamemode":
+		if !checkOp(player) {
+			return
+		}
+
+		var target Player
+		for _, p := range players {
+			if p.Authenticated() && p.Username() == words[1] {
+				target = p
+				break
+			}
+		}
+		if target == nil {
+			sendChat(player, ChatError+"Could not find target.")
+			return
+		}
+
+		switch words[2] {
+		case "creative", "c", "1":
+			target.SetGameMode(protocol.Creative)
+		case "survival", "s", "0":
+			target.SetGameMode(protocol.Survival)
+		default:
+			sendChat(player, ChatError+"Unknown game mode.")
+			return
+		}
+
+		sendChat(player, ChatInfo+"You have changed "+formatUsername(target)+"'s game mode.")
+		sendChat(target, formatUsername(player)+" has changed your game mode.")
+
 	default:
 		sendChat(player, ChatError+"Unknown command.")
 	}
+}
+
+func checkOp(player Player) bool {
+	if !IsOp(player) {
+		if isNetworkAdmin(player) {
+			sendChat(player, ChatInfo+"Using network admin override...")
+		} else {
+			sendChat(player, ChatNotAllowed)
+			return false
+		}
+	}
+	return true
 }
 
 func sendChat(player Player, message string) {
