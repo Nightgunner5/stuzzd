@@ -272,8 +272,8 @@ func ticker() {
 			updateCount++
 			delete(updateQueue, block)
 			runtime.Gosched() // Don't cause too much lag
-			if updateCount >= 1000000 {
-				log.Print("> 1000000 updates. Waiting for the next tick to resume updating.")
+			if updateCount >= 10000 {
+				log.Print("> 10000 updates. Waiting for the next tick to resume updating.")
 				break
 			}
 		}
