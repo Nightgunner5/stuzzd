@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	dir, err := os.Open(os.Args[0])
+	dir, err := os.Open(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -25,7 +25,7 @@ func main() {
 			sectors := int32(file.Size() >> 12)
 			accountedFor := make([]string, sectors)
 			accountedFor[0], accountedFor[1] = "location header", "timestamp header"
-			f, _ := os.Open(os.Args[0] + "/" + file.Name())
+			f, _ := os.Open(os.Args[1] + "/" + file.Name())
 			for z := 0; z < 32; z++ {
 				for x := 0; x < 32; x++ {
 					var location int32
