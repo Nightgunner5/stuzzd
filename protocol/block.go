@@ -364,6 +364,10 @@ func (c *Chunk) Compressed() []byte {
 	return c.compressed
 }
 
+func (c *Chunk) MarkDirtyForTesting() {
+	c.dirty = true
+}
+
 func (c *Chunk) MarkUsed() {
 	atomic.AddInt64(&c.users, 1)
 	if c.interruptRecycle != nil {
