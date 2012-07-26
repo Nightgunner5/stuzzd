@@ -545,7 +545,7 @@ func (p ChunkAllocation) Packet() []byte {
 type ChunkData struct {
 	X     int32
 	Z     int32
-	Chunk *Chunk
+	Payload []byte
 }
 
 func (p ChunkData) Packet() []byte {
@@ -556,12 +556,9 @@ func (p ChunkData) Packet() []byte {
 	binary.Write(&buf, binary.BigEndian, uint8(1))
 	binary.Write(&buf, binary.BigEndian, ^uint16(0))
 	binary.Write(&buf, binary.BigEndian, uint16(0))
-
-	payload := p.Chunk.Compressed()
-
-	binary.Write(&buf, binary.BigEndian, int32(len(payload)))
+	binary.Write(&buf, binary.BigEndian, int32(len(p.Payload)))
 	binary.Write(&buf, binary.BigEndian, int32(0))
-	buf.Write(payload)
+	buf.Write(p.Payload)
 	return buf.Bytes()
 }
 

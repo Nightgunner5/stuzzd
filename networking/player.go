@@ -20,7 +20,7 @@ var OnlinePlayerCount uint8
 func HandlePlayer(conn net.Conn) Player {
 	p := new(player)
 	p.id = assignID()
-	p.chunkSet = make(map[uint64]*protocol.Chunk)
+	p.chunkSet = make(map[uint64]*Chunk)
 	p.sendq = make(chan protocol.Packet)
 
 	go func() {
@@ -212,7 +212,7 @@ type player struct {
 	movecounter   uint8
 	lastMoveTick  uint64
 	gameMode      protocol.ServerMode
-	chunkSet      map[uint64]*protocol.Chunk
+	chunkSet      map[uint64]*Chunk
 	spawned       bool
 }
 
@@ -318,7 +318,7 @@ func (p *player) sendWorldData() {
 					for z := middleZ - i; z < middleZ+i; z++ {
 						id := uint64(uint32(x))<<32 | uint64(uint32(z))
 						if _, ok := p.chunkSet[id]; !ok {
-							p.chunkSet[id] = GetChunkMark(x, z)
+							p.chunkSet[id] = GetChunk(x, z)
 							sendChunk(p, x, z, p.chunkSet[id])
 							runtime.Gosched()
 						}

@@ -2,6 +2,7 @@ package networking
 
 import (
 	"github.com/Nightgunner5/stuzzd/protocol"
+	"github.com/Nightgunner5/stuzzd/storage"
 	"log"
 	"runtime"
 	"sync"
@@ -9,7 +10,7 @@ import (
 )
 
 // Wait a tick before unmarking the chunk to stop it from hitting 0 users over and over during the same tick.
-func unmarkChunkDelayed(chunk *protocol.Chunk) {
+func unmarkChunkDelayed(chunk *Chunk) {
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		chunk.MarkUnused()
@@ -20,7 +21,7 @@ func GetBlockAt(x, y, z int32) protocol.BlockType {
 	if y < 0 || y > 255 {
 		return protocol.Air
 	}
-	chunk := GetChunkAtMark(x, z)
+	chunk := GetChunkContaining(x, z)
 	defer unmarkChunkDelayed(chunk)
 	return chunk.GetBlock(uint8(x&0xF), uint8(y), uint8(z&0xF))
 }
@@ -29,7 +30,7 @@ func GetBlockDataAt(x, y, z int32) uint8 {
 	if y < 0 || y > 255 {
 		return 0
 	}
-	chunk := GetChunkAtMark(x, z)
+	chunk := GetChunkContaining(x, z)
 	defer unmarkChunkDelayed(chunk)
 	return chunk.GetBlockData(uint8(x&0xF), uint8(y), uint8(z&0xF))
 }
@@ -38,7 +39,7 @@ func PlayerSetBlockAt(x, y, z int32, block protocol.BlockType, data uint8) {
 	if y < 0 || y > 255 {
 		return
 	}
-	chunk := GetChunkAtMark(x, z)
+	chunk := GetChunkContaining(x, z)
 	defer unmarkChunkDelayed(chunk)
 	chunk.SetBlock(uint8(x&0xF), uint8(y), uint8(z&0xF), block)
 	chunk.SetBlockData(uint8(x&0xF), uint8(y), uint8(z&0xF), data)
@@ -50,7 +51,7 @@ func SetBlockAt(x, y, z int32, block protocol.BlockType, data uint8) {
 	if y < 0 || y > 255 {
 		return
 	}
-	chunk := GetChunkAtMark(x, z)
+	chunk := GetChunkContaining(x, z)
 	defer unmarkChunkDelayed(chunk)
 	chunk.SetBlock(uint8(x&0xF), uint8(y), uint8(z&0xF), block)
 	chunk.SetBlockData(uint8(x&0xF), uint8(y), uint8(z&0xF), data)
@@ -62,7 +63,7 @@ func setBlockNoUpdate(x, y, z int32, block protocol.BlockType, data uint8) {
 	if y < 0 || y > 255 {
 		return
 	}
-	chunk := GetChunkAtMark(x, z)
+	chunk := GetChunkContaining(x, z)
 	defer unmarkChunkDelayed(chunk)
 	chunk.SetBlock(uint8(x&0xF), uint8(y), uint8(z&0xF), block)
 	chunk.SetBlockData(uint8(x&0xF), uint8(y), uint8(z&0xF), data)
@@ -72,7 +73,7 @@ func startBlockUpdate(x, y, z int32) {
 	for X := x - 1; X <= x+1; X++ {
 		for Y := y - 1; Y <= y+1; Y++ {
 			for Z := z - 1; Z <= z+1; Z++ {
-				chunk := GetChunkAtMark(X, Z)
+				chunk := GetChunkContaining(X, Z)
 				switch chunk.GetBlock(uint8(X&0xF), uint8(Y), uint8(Z&0xF)) {
 				case protocol.Water, protocol.StationaryWater:
 					chunk.SetBlock(uint8(X&0xF), uint8(Y), uint8(Z&0xF), protocol.Water)
@@ -279,7 +280,7 @@ func ticker() {
 		}
 
 		for chunk, blocks := range blockSendQueue {
-			c := GetChunkMark(chunk.x, chunk.z)
+			c := GetChunk(chunk.x, chunk.z)
 			packet := protocol.MultiBlockChange{X: chunk.x, Z: chunk.z, Blocks: make([]uint32, 0, len(blocks))}
 			for block, _ := range blocks {
 				packet.Blocks = append(packet.Blocks, uint32(block.x)<<28|uint32(block.z)<<24|uint32(block.y)<<16|uint32(c.GetBlock(block.x, block.y, block.z))<<4|uint32(c.GetBlockData(block.x, block.y, block.z)))
@@ -295,45 +296,35 @@ func init() {
 	go ticker()
 }
 
-func loadChunk(chunkX, chunkZ int32) *protocol.Chunk {
-	return ChunkGen(chunkX, chunkZ)
+func loadChunk(chunkX, chunkZ int32) *Chunk {
+	chunk, err := storage.ReadChunk(chunkX, chunkZ)
+	if err != nil {
+		return ChunkGen(chunkX, chunkZ)
+	}
+	decoded := new(Chunk)
+	decoded.decode(chunk)
+	return decoded
 }
 
 func InitSpawnArea() {
 	for x := int32(-8); x < 8; x++ {
 		for z := int32(-8); z < 8; z++ {
 			runtime.Gosched() // We want to accept connections while we start up, even on GOMAXPROCS=1.
-			chunk := GetChunkMark(x, z)
+			chunk := GetChunk(x, z)
 			chunk.Compressed()
 			// Don't release the chunks so connecting the game will be faster for new players.
 		}
 	}
 }
 
-var chunks = make(map[uint64]*protocol.Chunk)
+var chunks = make(map[uint64]*Chunk)
 var chunkLock sync.RWMutex
 
-func GetChunkAtMark(x, z int32) *protocol.Chunk {
-	return GetChunkMark(x>>4, z>>4)
+func GetChunkContaining(x, z int32) *Chunk {
+	return GetChunk(x>>4, z>>4)
 }
 
-//func GetChunk(x, z int32) *protocol.Chunk {
-//	id := uint64(uint32(x))<<32 | uint64(uint32(z)) // Yes, this is required.
-//	chunkLock.RLock()
-//	if chunk, ok := chunks[id]; ok {
-//		chunkLock.RUnlock()
-//		return chunk
-//	}
-//	chunkLock.RUnlock()
-//
-//	chunkLock.Lock()
-//	defer chunkLock.Unlock()
-//
-//	chunks[id] = loadChunk(x, z)
-//	return chunks[id]
-//}
-
-func GetChunkMark(x, z int32) *protocol.Chunk {
+func GetChunk(x, z int32) *Chunk {
 	id := uint64(uint32(x))<<32 | uint64(uint32(z))
 	chunkLock.RLock()
 	if chunk, ok := chunks[id]; ok {
@@ -351,17 +342,15 @@ func GetChunkMark(x, z int32) *protocol.Chunk {
 	return chunks[id]
 }
 
-func init() {
-	protocol.RecycleChunk = func(c *protocol.Chunk) {
-		chunkLock.Lock()
-		defer chunkLock.Unlock()
+func recycleChunk(c *Chunk) {
+	chunkLock.Lock()
+	defer chunkLock.Unlock()
 
-		for id, chunk := range chunks {
-			if chunk == c {
-				c.Save()
-				delete(chunks, id)
-				return
-			}
+	for id, chunk := range chunks {
+		if chunk == c {
+			c.Save()
+			delete(chunks, id)
+			return
 		}
 	}
 }

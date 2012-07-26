@@ -14,8 +14,8 @@ func river(in float64) float64 {
 	return out
 }
 
-func ChunkGen(chunkX, chunkZ int32) *protocol.Chunk {
-	chunk := new(protocol.Chunk)
+func ChunkGen(chunkX, chunkZ int32) *Chunk {
+	chunk := new(Chunk)
 
 	r := rand.New(rand.NewSource(int64(uint32(chunkX))<<32 | int64(uint32(chunkZ))))
 

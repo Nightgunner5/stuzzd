@@ -95,7 +95,7 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 			fallthrough
 		case 2:
 			if GetBlockAt(pkt.X, int32(pkt.Y), pkt.Z) != protocol.Bedrock {
-				SetBlockAt(pkt.X, int32(pkt.Y), pkt.Z, protocol.Air, 0)
+				PlayerSetBlockAt(pkt.X, int32(pkt.Y), pkt.Z, protocol.Air, 0)
 			}
 		}
 		// TODO: validation
@@ -128,12 +128,12 @@ func init() {
 	}()
 }
 
-func sendChunk(p Player, x, z int32, chunk *protocol.Chunk) {
+func sendChunk(p Player, x, z int32, chunk *Chunk) {
 	if chunk == nil {
 		p.SendPacketSync(protocol.ChunkAllocation{X: x, Z: z, Init: false})
 	} else {
 		p.SendPacketSync(protocol.ChunkAllocation{X: x, Z: z, Init: true})
-		p.SendPacketSync(protocol.ChunkData{X: x, Z: z, Chunk: chunk})
+		p.SendPacketSync(protocol.ChunkData{X: x, Z: z, Payload: chunk.Compressed()})
 	}
 }
 
