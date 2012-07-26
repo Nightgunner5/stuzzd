@@ -115,6 +115,19 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 	}
 }
 
+func init() {
+	go func() {
+		for {
+			time.Sleep(1 * time.Second)
+			for _, player := range players {
+				if player.Authenticated() {
+					SendToAll(protocol.PlayerListItem{Name: player.Username(), Online: true, Ping: 50})
+				}
+			}
+		}
+	}()
+}
+
 func sendChunk(p Player, x, z int32, chunk *protocol.Chunk) {
 	if chunk == nil {
 		p.SendPacketSync(protocol.ChunkAllocation{X: x, Z: z, Init: false})

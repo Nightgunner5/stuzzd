@@ -44,6 +44,7 @@ func HandlePlayer(conn net.Conn) Player {
 				OnlinePlayerCount--
 			}
 			time.Sleep(1 * time.Second)
+			SendToAllExcept(p, protocol.PlayerListItem{Name: p.Username(), Online: false, Ping: 0})
 			conn.Close()
 		}()
 		recvq := make(chan protocol.Packet)

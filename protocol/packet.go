@@ -567,7 +567,7 @@ func (p ChunkData) Packet() []byte {
 
 // No read function as this is not sent by the client.
 
-// Block Change (0x34)
+// Multi Block Change (0x34)
 type MultiBlockChange struct {
 	X, Z   int32
 	Blocks []uint32
@@ -583,6 +583,8 @@ func (p MultiBlockChange) Packet() []byte {
 	binary.Write(&buf, binary.BigEndian, p.Blocks)
 	return buf.Bytes()
 }
+
+// No read function as this is not sent by the client.
 
 // Block Change (0x35)
 type BlockChange struct {
@@ -601,6 +603,28 @@ func (p BlockChange) Packet() []byte {
 	binary.Write(&buf, binary.BigEndian, p.Z)
 	binary.Write(&buf, binary.BigEndian, p.Block)
 	binary.Write(&buf, binary.BigEndian, p.Data)
+	return buf.Bytes()
+}
+
+// No read function as this is not sent by the client.
+
+// Player List Item (0xC9)
+type PlayerListItem struct {
+	Name   string
+	Online bool
+	Ping   uint16
+}
+
+func (p PlayerListItem) Packet() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint8(0xC9))
+	buf.Write(stringToBytes(p.Name))
+	var online uint8
+	if p.Online {
+		online = 1
+	}
+	binary.Write(&buf, binary.BigEndian, online)
+	binary.Write(&buf, binary.BigEndian, p.Ping)
 	return buf.Bytes()
 }
 
