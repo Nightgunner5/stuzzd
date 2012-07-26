@@ -195,11 +195,14 @@ func spreadWater(x, y, z int32) bool {
 	return change
 }
 
-var blockSendQueue = make(map[struct{ x, z int32 }][]struct{ x, y, z uint8 })
+var blockSendQueue = make(map[struct{ x, z int32 }]map[struct{ x, y, z uint8 }]bool)
 
 func queueBlockSend(x, y, z int32) {
 	chunk := struct{ x, z int32 }{x >> 4, z >> 4}
-	blockSendQueue[chunk] = append(blockSendQueue[chunk], struct{ x, y, z uint8 }{uint8(x & 0xF), uint8(y), uint8(z & 0xF)})
+	if blockSendQueue[chunk] == nil {
+		blockSendQueue[chunk] = make(map[struct{ x, y, z uint8 }]bool)
+	}
+	blockSendQueue[chunk][struct{ x, y, z uint8 }{uint8(x & 0xF), uint8(y), uint8(z & 0xF)}] = true
 }
 
 var updateQueue = make(map[struct{ x, y, z int32 }]bool)
@@ -243,12 +246,14 @@ func ticker() {
 		}
 
 		for chunk, blocks := range blockSendQueue {
+			c := GetChunkMark(chunk.x, chunk.z)
 			packet := protocol.MultiBlockChange{X: chunk.x, Z: chunk.z, Blocks: make([]uint32, 0, len(blocks))}
-			for _, block := range blocks {
-				x, y, z := chunk.x<<4+int32(block.x), int32(block.y), chunk.z<<4+int32(block.z)
-				packet.Blocks = append(packet.Blocks, uint32(block.x)<<28|uint32(block.z)<<24|uint32(block.y)<<16|uint32(GetBlockAt(x, y, z))<<4|uint32(GetBlockDataAt(x, y, z)))
+			for block, _ := range blocks {
+				packet.Blocks = append(packet.Blocks, uint32(block.x)<<28|uint32(block.z)<<24|uint32(block.y)<<16|uint32(c.GetBlock(block.x, block.y, block.z))<<4|uint32(c.GetBlockData(block.x, block.y, block.z)))
 			}
+			c.MarkUnused()
 			SendToAll(packet)
+			delete(blockSendQueue, chunk)
 		}
 	}
 }
