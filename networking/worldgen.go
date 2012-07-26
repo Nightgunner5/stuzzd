@@ -19,9 +19,6 @@ func ChunkGen(chunkX, chunkZ int32) *protocol.Chunk {
 
 	r := rand.New(rand.NewSource(int64(uint32(chunkX))<<32 | int64(uint32(chunkZ))))
 
-	height1 := uint8(r.Intn(64) + 1)
-	height2 := uint8(r.Intn(64)*r.Intn(3)) + height1
-
 	for x := uint8(0); x < 16; x++ {
 		for z := uint8(0); z < 16; z++ {
 			chunk.SetBlock(x, 0, z, protocol.Bedrock)
@@ -43,7 +40,7 @@ func ChunkGen(chunkX, chunkZ int32) *protocol.Chunk {
 
 			river := uint8(river(util.Noise2(fx/4, fz/4)))
 
-			for y := uint8(1); y < land - stone; y++ {
+			for y := uint8(1); y < land-stone; y++ {
 				chunk.SetBlock(x, y, z, protocol.Stone)
 			}
 
@@ -62,19 +59,19 @@ func ChunkGen(chunkX, chunkZ int32) *protocol.Chunk {
 				chunk.SetBlock(x, y, z, protocol.StationaryWater)
 			}
 
-			if river == 0 || change2 > 50 {
-				chunk.SetBlock(x, change2, z, protocol.Grass)
+			if river == 0 || land > 50 {
+				chunk.SetBlock(x, land, z, protocol.Grass)
 				if r.Intn(3) == 0 {
 					if r.Intn(8) == 0 {
-						fy := float64(change2 + 1)
+						fy := float64(land + 1)
 						if util.Noise3(fx/2, fy/2, fz/2) > 0 {
-							chunk.SetBlock(x, change2+1, z, protocol.RedFlower)
+							chunk.SetBlock(x, land+1, z, protocol.RedFlower)
 						} else {
-							chunk.SetBlock(x, change2+1, z, protocol.YellowFlower)
+							chunk.SetBlock(x, land+1, z, protocol.YellowFlower)
 						}
 					} else {
-						chunk.SetBlock(x, change2+1, z, protocol.LongGrass)
-						chunk.SetBlockData(x, change2+1, z, 1)
+						chunk.SetBlock(x, land+1, z, protocol.LongGrass)
+						chunk.SetBlockData(x, land+1, z, 1)
 					}
 				}
 				chunk.SetBiome(x, z, protocol.Plains)
