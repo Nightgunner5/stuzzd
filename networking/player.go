@@ -311,7 +311,7 @@ func (p *player) sendWorldData() {
 				}
 			}
 
-			for i := int32(1); i <= 4; i++ {
+			for i := int32(1); i <= 8; i++ {
 				middleX, middleZ := int32(p.x/16), int32(p.z/16)
 				for x := middleX - i; x < middleX+i; x++ {
 					for z := middleZ - i; z < middleZ+i; z++ {

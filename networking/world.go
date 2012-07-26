@@ -174,6 +174,39 @@ func spreadWater(x, y, z int32) bool {
 			change = true
 			continue
 		}
+
+		if xneg < xpos-1 && xneg < 8 && xpos > 0 && xpos <= 8 {
+			xneg++
+			incrementWater(x-1, y, z)
+			xpos--
+			decrementWater(x+1, y, z)
+			change = true
+			continue
+		}
+		if xpos < xneg-1 && xpos < 8 && xneg > 0 && xneg <= 8 {
+			xpos++
+			incrementWater(x+1, y, z)
+			xneg--
+			decrementWater(x-1, y, z)
+			change = true
+			continue
+		}
+		if zneg < zpos-1 && zneg < 8 && zpos > 0 && zpos <= 8 {
+			zneg++
+			incrementWater(x, y, z-1)
+			zpos--
+			decrementWater(x, y, z+1)
+			change = true
+			continue
+		}
+		if zpos < zneg-1 && zpos < 8 && zneg > 0 && zneg <= 8 {
+			zpos++
+			incrementWater(x, y, z+1)
+			zneg--
+			decrementWater(x, y, z-1)
+			change = true
+			continue
+		}
 		break
 	}
 	// Get rid of the tiny bit of water that stays there forever
