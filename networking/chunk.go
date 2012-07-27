@@ -195,7 +195,7 @@ func (c *Chunk) decode(stored map[string]interface{}) {
 		copy(c.lightSky[y][:], sec["SkyLight"].([]byte))
 		copy(c.lightBlock[y][:], sec["BlockLight"].([]byte))
 	}
-	for i, biome := range stored["Biomes"].([]byte) {
+	for i, biome := range stored["Level"].(map[string]interface{})["Biomes"].([]byte) {
 		c.biomes[i&0xF][i>>4] = protocol.Biome(biome)
 	}
 }
