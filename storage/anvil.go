@@ -18,7 +18,7 @@ func ReadChunk(chunkX, chunkZ int32) (*Chunk, error) {
 	}
 	defer region.Close()
 
-	region.Seek(int64(chunkZ<<5|chunkX)<<4, os.SEEK_SET)
+	region.Seek(int64(chunkZ<<5|chunkX)<<2, os.SEEK_SET)
 
 	var location uint32
 	binary.Read(region, binary.BigEndian, &location)
