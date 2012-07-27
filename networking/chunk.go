@@ -183,6 +183,9 @@ func (c *Chunk) Save() {
 func (c *Chunk) decode(stored map[string]interface{}) {
 	for _, section := range stored["Level"].(map[string]interface{})["Sections"].([]interface{}) {
 		sec := section.(map[string]interface{})
+		if sec["Y"] == nil {
+			continue // Bug?
+		}
 		y := sec["Y"].(int8)
 
 		for i, block := range sec["Blocks"].([]byte) {
