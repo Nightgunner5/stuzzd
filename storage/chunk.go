@@ -6,15 +6,15 @@ type ChunkHolder struct {
 
 type Chunk struct {
 	TerrainPopulated byte
-	X            int32 `nbt:"xPos"`
-	Z            int32 `nbt:"zPos"`
-	LastUpdate   uint64
-	Biomes       []byte
-	Entities     []Entity
-	Sections     []Section
-	TileEntities []TileEntity
-	TileTicks    []TileTick
-	HeightMap    [16 * 16]int32
+	X                int32 `nbt:"xPos"`
+	Z                int32 `nbt:"zPos"`
+	LastUpdate       uint64
+	Biomes           []byte
+	Entities         []Entity
+	Sections         []Section
+	TileEntities     []TileEntity
+	TileTicks        []TileTick
+	HeightMap        [16 * 16]int32
 }
 
 type Section struct {
@@ -43,5 +43,9 @@ type Entity struct {
 type TileEntity map[string]interface{}
 
 type TileTick struct {
-	I, T, X, Y, Z int32
+	Type  int32 `nbt:"i"`
+	Ticks int32 `nbt:"t"`
+	X     int32 `nbt:"x"`
+	Y     int32 `nbt:"y"`
+	Z     int32 `nbt:"z"`
 }
