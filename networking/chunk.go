@@ -184,8 +184,8 @@ func (c *Chunk) Save() {
 func (c *Chunk) decode(stored *storage.Chunk) {
 	for y, section := range stored.Sections {
 		// I may be wrong, but DAFUQ?
-		if section.Y < y {
-			section.Y = y
+		if section.Y < byte(y) {
+			section.Y = byte(y)
 		}
 		for i, block := range section.Blocks {
 			c.blocks[section.Y][i] = protocol.BlockType(block)
