@@ -1,5 +1,7 @@
 package storage
 
+import "github.com/Nightgunner5/stuzzd/protocol"
+
 type ChunkHolder struct {
 	Level Chunk
 }
@@ -9,7 +11,7 @@ type Chunk struct {
 	X                int32 `nbt:"xPos"`
 	Z                int32 `nbt:"zPos"`
 	LastUpdate       uint64
-	Biomes           []byte
+	Biomes           []protocol.Biome
 	Entities         []Entity
 	Sections         []Section
 	TileEntities     []TileEntity
@@ -20,7 +22,7 @@ type Chunk struct {
 type Section struct {
 	Y          byte
 	BlockLight []byte
-	Blocks     []byte
+	Blocks     []protocol.BlockType
 	Data       []byte
 	SkyLight   []byte
 }
@@ -35,9 +37,9 @@ type Entity struct {
 	HurtTime     uint16
 	FallDistance float32
 	Type         string `nbt:"id"`
-	Motion       [3]float64
-	Pos          [3]float64
-	Rotation     [2]float32
+	Motion       []float64
+	Pos          []float64
+	Rotation     []float32
 }
 
 type TileEntity map[string]interface{}
