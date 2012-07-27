@@ -38,8 +38,8 @@ func ReadChunk(chunkX, chunkZ int32) (*Chunk, error) {
 	}
 	defer r.Close()
 
-	chunk := new(Chunk)
-	nbt.Read(r, chunk)
+	var chunk ChunkHolder
+	nbt.Read(r, &chunk)
 
-	return chunk, nil
+	return &chunk.Level, nil
 }

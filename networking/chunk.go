@@ -1,12 +1,12 @@
 package networking
 
 import (
+	"bytes"
+	"compress/zlib"
+	"encoding/binary"
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"github.com/Nightgunner5/stuzzd/storage"
 	"sync"
-	"bytes"
-	"encoding/binary"
-	"compress/zlib"
 	"time"
 )
 
@@ -76,12 +76,12 @@ func (c *Chunk) InitLighting() {
 			for y := uint8(255); y >= 0 && brightness > 0 && brightness < 16; y-- {
 				c.lightSky.Set(x, y, z, brightness)
 				switch c.blocks.Get(x, y, z) { // Skip the lock
-					case protocol.Air, protocol.Glass:
-						// Don't change the brightness
-					case protocol.Water, protocol.StationaryWater:
-						brightness--
-					default:
-						brightness -= 4
+				case protocol.Air, protocol.Glass:
+					// Don't change the brightness
+				case protocol.Water, protocol.StationaryWater:
+					brightness--
+				default:
+					brightness -= 4
 				}
 			}
 		}
@@ -183,12 +183,14 @@ func (c *Chunk) Save() {
 
 func (c *Chunk) decode(stored *storage.Chunk) {
 	for _, section := range stored.Sections {
-		c.blocks[section.Y] = section.Blocks
-		c.blockData[section.Y] = section.Data
-		c.lightBlock[section.Y] = section.BlockLight
-		c.lightSky[section.Y] = section.SkyLight
+		for i, block := range section.Blocks {
+			c.blocks[section.Y][i] = protocol.BlockType(block)
+		}
+		copy(c.blockData[section.Y][:], section.Data)
+		copy(c.lightBlock[section.Y][:], section.BlockLight)
+		copy(c.lightSky[section.Y][:], section.SkyLight)
 	}
 	for i, biome := range stored.Biomes {
-		c.biomes[i&0xF][i>>4] = biome
+		c.biomes[i&0xF][i>>4] = protocol.Biome(biome)
 	}
 }

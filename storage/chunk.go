@@ -2,24 +2,29 @@ package storage
 
 import "github.com/Nightgunner5/stuzzd/protocol"
 
+type ChunkHolder struct {
+	Level *Chunk
+}
+
 type Chunk struct {
-	Populated    bool
+	TerrainPopulated byte
 	X            int32 `nbt:"xPos"`
-	Z            int32 `nbt:"yPos"`
+	Z            int32 `nbt:"zPos"`
 	LastUpdate   uint64
-	Biomes       []protocol.Biome
+	Biomes       []byte
 	Entities     []Entity
 	Sections     []Section
 	TileEntities []TileEntity
+	TileTicks    []TileTick
 	HeightMap    [16 * 16]int32
 }
 
 type Section struct {
 	Y          byte
-	BlockLight protocol.NibbleSection
-	Blocks     protocol.BlockSection
-	Data       protocol.NibbleSection
-	SkyLight   protocol.NibbleSection
+	BlockLight []byte
+	Blocks     []byte
+	Data       []byte
+	SkyLight   []byte
 }
 
 type Entity struct {
@@ -38,3 +43,7 @@ type Entity struct {
 }
 
 type TileEntity map[string]interface{}
+
+type TileTick struct {
+	I, T, X, Y, Z int32
+}
