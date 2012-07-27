@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"compress/zlib"
 	"encoding/binary"
 	"fmt"
@@ -30,9 +31,17 @@ func ReadChunk(chunkX, chunkZ int32) (*Chunk, error) {
 		return nil, fmt.Errorf("Chunk (%d, %d) in region (%d, %d) does not exist.", chunkX, chunkZ, regionX, regionZ)
 	}
 
-	region.Seek(int64(offset<<12+4 /* length */ +1 /* compression type (always zlib) */), os.SEEK_SET)
+	region.Seek(int64(offset<<12), os.SEEK_SET)
 
-	r, err := zlib.NewReader(region)
+	var length uint32
+	binary.Read(region, binary.BigEndian, &length)
+
+	// This next part is stupid, but only because the NBT library is stupid.
+	b := make([]byte, length)
+	region.Read(b)
+	buf := bytes.NewBuffer(b[1:])
+
+	r, err := zlib.NewReader(buf)
 	if err != nil {
 		return nil, err
 	}
