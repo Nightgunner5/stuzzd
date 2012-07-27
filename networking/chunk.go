@@ -5,7 +5,6 @@ import (
 	"compress/zlib"
 	"encoding/binary"
 	"github.com/Nightgunner5/stuzzd/protocol"
-	"github.com/Nightgunner5/stuzzd/storage"
 	"sync"
 	"time"
 )
@@ -181,20 +180,19 @@ func (c *Chunk) Save() {
 	c.needsSave = false
 }
 
-func (c *Chunk) decode(stored *storage.Chunk) {
-	for y, section := range stored.Sections {
-		// I may be wrong, but DAFUQ?
-		if section.Y < byte(y) {
-			section.Y = byte(y)
+func (c *Chunk) decode(stored map[string]interface{}) {
+	for _, section := range stored["Level"].(map[string]interface{})["Sections"].([]interface{}) {
+		sec := section.(map[string]interface{})
+		y := sec["Y"].(int8)
+
+		for i, block := range sec["Blocks"].([]byte) {
+			c.blocks[y][i] = protocol.BlockType(block)
 		}
-		for i, block := range section.Blocks {
-			c.blocks[section.Y][i] = protocol.BlockType(block)
-		}
-		copy(c.blockData[section.Y][:], section.Data)
-		copy(c.lightBlock[section.Y][:], section.BlockLight)
-		copy(c.lightSky[section.Y][:], section.SkyLight)
+		copy(c.blockData[y][:], sec["Data"].([]byte))
+		copy(c.lightSky[y][:], sec["SkyLight"].([]byte))
+		copy(c.lightBlock[y][:], sec["BlockLight"].([]byte))
 	}
-	for i, biome := range stored.Biomes {
+	for i, biome := range stored["Biomes"].([]byte) {
 		c.biomes[i&0xF][i>>4] = protocol.Biome(biome)
 	}
 }

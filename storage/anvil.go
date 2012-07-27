@@ -1,14 +1,13 @@
 package storage
 
 import (
-	"compress/zlib"
 	"encoding/binary"
 	"fmt"
-	"github.com/Nightgunner5/GoNBT"
+	"github.com/jteeuwen/nbt"
 	"os"
 )
 
-func ReadChunk(chunkX, chunkZ int32) (*Chunk, error) {
+func ReadChunk(chunkX, chunkZ int32) (map[string]interface{}, error) {
 	regionX, regionZ := chunkX>>5, chunkZ>>5
 	chunkX, chunkZ = chunkX&0x1F, chunkZ&0x1F
 
@@ -30,16 +29,12 @@ func ReadChunk(chunkX, chunkZ int32) (*Chunk, error) {
 		return nil, fmt.Errorf("Chunk (%d, %d) in region (%d, %d) does not exist.", chunkX, chunkZ, regionX, regionZ)
 	}
 
-	region.Seek(int64(offset<<12+4 /* length */ +1 /* compression type (always zlib) */), os.SEEK_SET)
+	region.Seek(int64((offset<<12)+4 /* length */ +1 /* compression type (always zlib) */), os.SEEK_SET)
 
-	r, err := zlib.NewReader(region)
+	tag, err := nbt.ReadStream(region, nbt.ZLib)
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
 
-	var chunk ChunkHolder
-	nbt.Read(r, &chunk)
-
-	return &chunk.Level, nil
+	return FromNBT(tag).(map[string]interface{}), nil
 }
