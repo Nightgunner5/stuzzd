@@ -1,7 +1,7 @@
 package storage
 
 type ChunkHolder struct {
-	Level *Chunk
+	Level Chunk
 }
 
 type Chunk struct {
