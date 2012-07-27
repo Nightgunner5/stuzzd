@@ -1,7 +1,5 @@
 package storage
 
-import "github.com/Nightgunner5/stuzzd/protocol"
-
 type ChunkHolder struct {
 	Level Chunk
 }
@@ -11,7 +9,7 @@ type Chunk struct {
 	X                int32 `nbt:"xPos"`
 	Z                int32 `nbt:"zPos"`
 	LastUpdate       uint64
-	Biomes           []protocol.Biome
+	Biomes           []byte
 	Entities         []Entity
 	Sections         []Section
 	TileEntities     []TileEntity
@@ -22,7 +20,7 @@ type Chunk struct {
 type Section struct {
 	Y          byte
 	BlockLight []byte
-	Blocks     []protocol.BlockType
+	Blocks     []byte
 	Data       []byte
 	SkyLight   []byte
 }

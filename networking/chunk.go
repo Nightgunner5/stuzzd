@@ -183,12 +183,14 @@ func (c *Chunk) Save() {
 
 func (c *Chunk) decode(stored *storage.Chunk) {
 	for _, section := range stored.Sections {
-		copy(c.blocks[section.Y][:], section.Blocks)
+		for i, block := range section.Blocks {
+			c.blocks[section.Y][i] = protocol.BlockType(block)
+		}
 		copy(c.blockData[section.Y][:], section.Data)
 		copy(c.lightBlock[section.Y][:], section.BlockLight)
 		copy(c.lightSky[section.Y][:], section.SkyLight)
 	}
 	for i, biome := range stored.Biomes {
-		c.biomes[i&0xF][i>>4] = biome
+		c.biomes[i&0xF][i>>4] = protocol.Biome(biome)
 	}
 }
