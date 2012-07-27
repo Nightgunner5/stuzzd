@@ -1,7 +1,5 @@
 package storage
 
-import "github.com/Nightgunner5/stuzzd/protocol"
-
 type ChunkHolder struct {
 	Level *Chunk
 }
