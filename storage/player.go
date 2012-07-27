@@ -3,7 +3,7 @@ package storage
 import (
 	"compress/gzip"
 	"github.com/Nightgunner5/stuzzd/protocol"
-	"github.com/bemasher/GoNBT"
+	"github.com/Nightgunner5/GoNBT"
 	"os"
 	"sync"
 )

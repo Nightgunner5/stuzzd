@@ -4,7 +4,7 @@ import (
 	"compress/zlib"
 	"encoding/binary"
 	"fmt"
-	"github.com/bemasher/GoNBT"
+	"github.com/Nightgunner5/GoNBT"
 	"os"
 )
 
