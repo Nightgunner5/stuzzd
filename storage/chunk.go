@@ -17,8 +17,8 @@ type Chunk struct {
 	Entities     []Entity
 	TileEntities []TileEntity
 	TileTicks    []TileTick
-	Biomes       [256]protocol.Biome
-	HeightMap    [256]int32
+	Biomes       []protocol.Biome
+	HeightMap    []int32
 }
 
 type Section struct {
@@ -32,9 +32,7 @@ type Section struct {
 }
 
 type Entity map[string]interface{}
-
-type TileEntity struct {
-}
+type TileEntity map[string]interface{}
 
 type TileTick struct {
 	Type  uint32 `nbt:"i"`

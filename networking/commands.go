@@ -223,6 +223,7 @@ func init() {
 	r := bufio.NewReader(f)
 	for {
 		op, err := r.ReadString('\n')
+		op = strings.TrimSpace(op)
 		if op != "" {
 			ops[op] = true
 		}

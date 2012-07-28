@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"github.com/Nightgunner5/go.nbt"
@@ -34,11 +35,23 @@ func ReadChunk(chunkX, chunkZ int32) (*Chunk, error) {
 		return nil, fmt.Errorf("Chunk (%d, %d) in region (%d, %d) does not exist.", chunkX, chunkZ, regionX, regionZ)
 	}
 
-	f.Seek(int64((offset<<12)+4 /* length */ +1 /* compression type (always zlib) */), os.SEEK_SET)
+	f.Seek(int64(offset)<<12, os.SEEK_SET)
+	var length uint32
+	binary.Read(f, binary.BigEndian, &length)
+	length--
+
+	var compression nbt.Compression
+	binary.Read(f, binary.BigEndian, &compression)
+
+	buf := make([]byte, length)
+	_, err = f.Read(buf)
+	if err != nil {
+		return nil, err
+	}
 
 	var chunk ChunkHolder
 
-	err = nbt.Unmarshal(nbt.ZLib, f, &chunk)
+	err = nbt.Unmarshal(compression, bytes.NewReader(buf), &chunk)
 
 	return &chunk.Level, err
 }

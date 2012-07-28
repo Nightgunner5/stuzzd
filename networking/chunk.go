@@ -182,5 +182,11 @@ func (c *Chunk) Save() {
 }
 
 func (c *Chunk) decode(stored *storage.Chunk) {
-	// TODO
+	for _, section := range stored.Sections {
+		copy(c.blocks[section.Y][:], section.Blocks[:])
+		copy(c.blockData[section.Y][:], section.Data[:])
+		copy(c.lightSky[section.Y][:], section.SkyLight[:])
+		copy(c.lightBlock[section.Y][:], section.BlockLight[:])
+	}
+	c.dirty = true
 }
