@@ -1,9 +1,7 @@
 package storage
 
 import (
-	"compress/gzip"
-	"github.com/Nightgunner5/stuzzd/protocol"
-	"github.com/Nightgunner5/GoNBT"
+	"github.com/Nightgunner5/go.nbt"
 	"os"
 	"sync"
 )
@@ -35,36 +33,72 @@ func loadPlayer(name string) *Player {
 		player.defaults()
 		return player
 	}
-	gz, _ := gzip.NewReader(f)
-	defer gz.Close()
+	defer f.Close()
 
-	nbt.Read(gz, &player)
+	err = nbt.Unmarshal(nbt.GZip, f, &player)
+	if err != nil {
+		panic(err)
+	}
 	return player
 }
 
 type Player struct {
-	OnGround       bool
-	Sleeping       bool
-	Air            int16
-	AttackTime     int16
-	DeathTime      int16
-	Fire           int16
-	Health         int16
-	HurtTime       int16
-	Dimension      protocol.Dimension
-	FoodLevel      int32               `nbt:"foodLevel"`
-	FoodTickTimer  int32               `nbt:"foodTickTimer"`
-	GameMode       protocol.ServerMode `nbt:"playerGameType"`
-	XpLevel        int32
-	XpTotal        int32
-	FallDistance   float32
-	FoodExhaustion float32 `nbt:"foodExhastionLevel"`
-	FoodSaturation float32 `nbt:"foodSaturationLevel"`
-	XpP            float32
-	Inventory      map[string]*InventoryItem
-	Motion         []float64
-	Position       []float64
-	Rotation       []float32
+	FoodSaturationLevel float32 `nbt:"foodSaturationLevel"`
+	FoodExhaustionLevel float32 `nbt:"foodExhaustionLevel"`
+	FoodTickTimer       uint32  `nbt:"foodTickTimer"`
+	FoodLevel           uint32  `nbt:"foodLevel"`
+
+	XpLevel uint32
+	XpP     float32
+	XpTotal uint32
+
+	Health uint16
+	Fire   uint16
+	Air    uint16
+
+	AttackTime uint16
+	DeathTime  uint16
+	HurtTime   uint16
+
+	FallDistance float32
+
+	Sleeping   bool
+	SleepTimer uint16
+
+	SpawnX int32
+	SpawnY int32
+	SpawnZ int32
+
+	OnGround  bool
+	Position  []float64 `nbt:"Pos"`
+	Motion    []float64
+	Rotation  []float32
+	Dimension int32
+
+	GameType  uint32          `nbt:"playerGameType"`
+	Abilities PlayerAbilities `nbt:"abilities"`
+
+	Inventory  []InventoryItem
+	EnderItems []InventoryItem
+}
+
+type PlayerAbilities struct {
+	MayFly bool `nbt:"mayfly"`
+	Flying bool `nbt:"flying"`
+
+	FlySpeed  float32 `nbt:"flySpeed"`
+	WalkSpeed float32 `nbt:"walkSpeed"`
+
+	InstaBuild   bool `nbt:"instabuild"`
+	Invulnerable bool `nbt:"invulnerable"`
+	MayBuild     bool `nbt:"mayBuild"`
+}
+
+type InventoryItem struct {
+	Type   uint16 `nbt:"id"`
+	Damage uint16
+	Count  uint8
+	Slot   uint8
 }
 
 func (p *Player) defaults() {
@@ -75,11 +109,4 @@ func (p *Player) defaults() {
 
 func (p *Player) Save() {
 	// MASSIVE TODO
-}
-
-type InventoryItem struct {
-	Count  int8
-	Slot   int8
-	Damage int16
-	ID     int16 `nbt:"id"`
 }

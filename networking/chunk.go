@@ -5,6 +5,7 @@ import (
 	"compress/zlib"
 	"encoding/binary"
 	"github.com/Nightgunner5/stuzzd/protocol"
+	"github.com/Nightgunner5/stuzzd/storage"
 	"sync"
 	"time"
 )
@@ -180,22 +181,6 @@ func (c *Chunk) Save() {
 	c.needsSave = false
 }
 
-func (c *Chunk) decode(stored map[string]interface{}) {
-	for _, section := range stored["Level"].(map[string]interface{})["Sections"].([]interface{}) {
-		sec := section.(map[string]interface{})
-		if sec["Y"] == nil {
-			continue // Bug?
-		}
-		y := sec["Y"].(int8)
-
-		for i, block := range sec["Blocks"].([]byte) {
-			c.blocks[y][i] = protocol.BlockType(block)
-		}
-		copy(c.blockData[y][:], sec["Data"].([]byte))
-		copy(c.lightSky[y][:], sec["SkyLight"].([]byte))
-		copy(c.lightBlock[y][:], sec["BlockLight"].([]byte))
-	}
-	for i, biome := range stored["Level"].(map[string]interface{})["Biomes"].([]byte) {
-		c.biomes[i&0xF][i>>4] = protocol.Biome(biome)
-	}
+func (c *Chunk) decode(stored *storage.Chunk) {
+	// TODO
 }

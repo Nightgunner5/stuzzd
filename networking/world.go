@@ -299,6 +299,7 @@ func init() {
 func loadChunk(chunkX, chunkZ int32) *Chunk {
 	chunk, err := storage.ReadChunk(chunkX, chunkZ)
 	if err != nil {
+		log.Print(err)
 		return ChunkGen(chunkX, chunkZ)
 	}
 	decoded := new(Chunk)
