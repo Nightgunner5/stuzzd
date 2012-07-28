@@ -3,6 +3,7 @@ package networking
 import (
 	"bufio"
 	"fmt"
+	"github.com/Nightgunner5/stuzzd/config"
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"io"
 	"log"
@@ -25,13 +26,16 @@ var CommandHelp = map[string]struct {
 	Description string
 	OpOnly      bool
 }{
-	"help": {Description: "This command.", OpOnly: false},
-	"me":   {Description: "Describe an action, like \"/me eats a cupcake.\"", OpOnly: false},
-	"who":  {Description: "List the players currently online.", OpOnly: false},
-	"op":   {Description: "Give a player operator status.", OpOnly: true},
-	"deop": {Description: "Revoke a player's operator status.", OpOnly: true},
-	"kick": {Description: "Kick a player from the server with an optional message.", OpOnly: true},
-	"tpt":  {Description: "Teleport yourself to a player.", OpOnly: true},
+	"help":  {Description: "This command.", OpOnly: false},
+	"me":    {Description: "Describe an action, like \"/me eats a cupcake.\"", OpOnly: false},
+	"who":   {Description: "List the players currently online.", OpOnly: false},
+	"op":    {Description: "Give a player operator status.", OpOnly: true},
+	"deop":  {Description: "Revoke a player's operator status.", OpOnly: true},
+	"kick":  {Description: "Kick a player from the server with an optional message.", OpOnly: true},
+	"tpt":   {Description: "Teleport yourself to a player.", OpOnly: true},
+	"gm":    {Description: "Set a player's game mode to creative (c) or survival (s).", OpOnly: true},
+	"day":   {Description: "Advance to the next day.", OpOnly: true},
+	"night": {Description: "Advance to the next night.", OpOnly: true},
 }
 
 func handleCommand(player Player, command string) {
@@ -188,6 +192,28 @@ func handleCommand(player Player, command string) {
 
 		sendChat(player, ChatInfo+"You have changed "+formatUsername(target)+"'s game mode.")
 		sendChat(target, formatUsername(player)+" has changed your game mode.")
+
+	case "day":
+		if !checkOp(player) {
+			return
+		}
+
+		config.Tick += 24000 - (config.Tick % 24000)
+
+		SendToAll(protocol.TimeUpdate{Time: config.Tick})
+
+	case "night":
+		if !checkOp(player) {
+			return
+		}
+
+		if config.Tick%24000 < 18000 {
+			config.Tick += 18000 - (config.Tick % 24000)
+		} else {
+			config.Tick += 24000 + 18000 - (config.Tick % 24000)
+		}
+
+		SendToAll(protocol.TimeUpdate{Time: config.Tick})
 
 	default:
 		sendChat(player, ChatError+"Unknown command.")
