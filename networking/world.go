@@ -78,7 +78,7 @@ func startBlockUpdate(x, y, z int32) {
 				case protocol.Water, protocol.StationaryWater:
 					chunk.SetBlock(uint8(X&0xF), uint8(Y), uint8(Z&0xF), protocol.Water)
 					queueUpdate(X, Y, Z)
-				case protocol.Sponge, protocol.Gravel, protocol.Sand:
+				case protocol.Sponge, protocol.Gravel, protocol.Sand, protocol.LongGrass, protocol.RedFlower, protocol.YellowFlower:
 					queueUpdate(X, Y, Z)
 				}
 				chunk.MarkUnused()
@@ -259,10 +259,11 @@ func ticker() {
 				if !spreadWater(x, y, z) && GetBlockAt(x, y, z) == protocol.Water {
 					setBlockNoUpdate(x, y, z, protocol.StationaryWater, GetBlockDataAt(x, y, z))
 				}
-			case protocol.Sand, protocol.Gravel:
+			case protocol.Sand, protocol.Gravel, protocol.LongGrass, protocol.RedFlower, protocol.YellowFlower:
 				if GetBlockAt(x, y-1, z).Passable() {
+					blockData := GetBlockDataAt(x, y, z)
 					SetBlockAt(x, y, z, GetBlockAt(x, y-1, z), GetBlockDataAt(x, y-1, z))
-					SetBlockAt(x, y-1, z, blockType, 0)
+					SetBlockAt(x, y-1, z, blockType, blockData)
 				}
 			case protocol.Sponge:
 				switch GetBlockAt(x, y+1, z) {
