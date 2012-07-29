@@ -18,8 +18,6 @@ var flagHostPort = flag.String("hostport", ":25565", "The host and port to liste
 var flagCPUProfile = flag.String("cpuprofile", "", "write cpu profile to file")
 var flagMemProfile = flag.String("memprofile", "", "write memory profile to file")
 
-var flagNumSlots = flag.Int("numslots", 10, "The maximum number of players allowed on this server at a time.")
-
 const TICK = time.Second / 20
 
 func main() {
@@ -46,8 +44,6 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Print("Now listening on ", *flagHostPort)
-
-	config.NumSlots = uint64(*flagNumSlots)
 
 	go func() {
 		for {

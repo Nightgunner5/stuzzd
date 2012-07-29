@@ -28,7 +28,7 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 		req.Body.Read(buf)
 		if string(buf) == "YES" {
 			p.(*player).authenticated = true
-			if OnlinePlayerCount >= config.NumSlots {
+			if OnlinePlayerCount >= config.Config.NumSlots {
 				p.SendPacketSync(protocol.Kick{Reason: "Server is full!"})
 				return
 			}
@@ -43,7 +43,7 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 				ServerMode: p.(*player).gameMode,
 				Dimension:  protocol.Overworld,
 				Difficulty: protocol.Peaceful,
-				MaxPlayers: uint8(config.NumSlots), // If you have more than 255 slots, I applaud you.
+				MaxPlayers: uint8(config.Config.NumSlots), // If you have more than 255 slots, I applaud you.
 			})
 			stored := storage.GetPlayer(p.Username())
 			p.SetPosition(stored.Position[0], stored.Position[1], stored.Position[2])
@@ -107,7 +107,7 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 	case protocol.PlayerAbilities:
 		// TODO
 	case protocol.ServerListPing:
-		p.SendPacketSync(protocol.Kick{Reason: fmt.Sprintf("%s§%d§%d", config.ServerDescription(), OnlinePlayerCount, config.NumSlots)})
+		p.SendPacketSync(protocol.Kick{Reason: fmt.Sprintf("%s§%d§%d", config.Config.ServerDescription, OnlinePlayerCount, config.Config.NumSlots)})
 	case protocol.Kick:
 		log.Print(p.Username(), " disconnected.")
 		SendToAll(protocol.Chat{Message: fmt.Sprintf("%s disconnected.", formatUsername(p))})

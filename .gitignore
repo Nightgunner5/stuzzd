@@ -24,3 +24,4 @@ stuzzd
 *.prof
 ops.txt
 world/
+stuzzd.conf
