@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-var OnlinePlayerCount uint8
+var OnlinePlayerCount uint64
 
 func HandlePlayer(conn net.Conn) Player {
 	p := new(player)

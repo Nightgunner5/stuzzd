@@ -47,7 +47,7 @@ func main() {
 	}
 	log.Print("Now listening on ", *flagHostPort)
 
-	config.NumSlots = uint8(*flagNumSlots)
+	config.NumSlots = uint64(*flagNumSlots)
 
 	go func() {
 		for {

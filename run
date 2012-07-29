@@ -7,9 +7,6 @@ go get -u -v -d
 git checkout master
 git pull
 
-# Build.
-go build -v
-
-# And finally, start the server.
-echo Starting server...
+# Build and start the server.
+go build -v && \
 GOMAXPROCS=1 ./stuzzd -cpuprofile cpu-$BASHPID.prof -memprofile mem-$BASHPID.prof -numslots 100

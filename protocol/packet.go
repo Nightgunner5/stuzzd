@@ -543,8 +543,8 @@ func (p ChunkAllocation) Packet() []byte {
 
 // Chunk Data (0x33)
 type ChunkData struct {
-	X     int32
-	Z     int32
+	X       int32
+	Z       int32
 	Payload []byte
 }
 

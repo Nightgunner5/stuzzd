@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"github.com/Nightgunner5/stuzzd/storage"
+	"log"
 	"sync"
 	"time"
 )
@@ -189,7 +190,10 @@ func (c *Chunk) Save() {
 		copy(section.BlockLight[:], c.lightBlock[i][:])
 	}
 
-	storage.WriteChunk(chunk)
+	err := storage.WriteChunk(chunk)
+	if err != nil {
+		log.Print(err)
+	}
 
 	c.needsSave = false
 }

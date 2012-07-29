@@ -7,4 +7,4 @@ func ServerDescription() string {
 	return "StuzzD Private Toaster"
 }
 
-var NumSlots uint8
+var NumSlots uint64

@@ -42,7 +42,7 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 				ServerMode: p.(*player).gameMode,
 				Dimension:  protocol.Overworld,
 				Difficulty: protocol.Peaceful,
-				MaxPlayers: config.NumSlots,
+				MaxPlayers: uint8(config.NumSlots), // If you have more than 255 slots, I applaud you.
 			})
 			stored := storage.GetPlayer(p.Username())
 			p.SetPosition(stored.Position[0], stored.Position[1], stored.Position[2])
