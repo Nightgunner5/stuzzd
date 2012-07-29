@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/Nightgunner5/go.nbt"
+	"github.com/Nightgunner5/stuzzd/chunk"
 	"os"
 	"sync"
 )
@@ -24,7 +25,7 @@ func getLock(chunkX, chunkZ int32) *sync.RWMutex {
 	return locks[regionID]
 }
 
-func ReadChunk(chunkX, chunkZ int32) (*Chunk, error) {
+func ReadChunk(chunkX, chunkZ int32) (*chunk.Chunk, error) {
 	lock := getLock(chunkX, chunkZ)
 	lock.RLock()
 	defer lock.RUnlock()
@@ -71,10 +72,16 @@ func ReadChunk(chunkX, chunkZ int32) (*Chunk, error) {
 	return &chunk.Level, err
 }
 
-func WriteChunk(chunk *Chunk) error {
+func WriteChunk(chunk *chunk.Chunk) error {
+	if !chunk.NeedsSave {
+		return nil
+	}
+
 	lock := getLock(chunk.X, chunk.Z)
 	lock.Lock()
 	defer lock.Unlock()
+
+	chunk.NeedsSave = false
 
 	regionX, regionZ := chunk.X>>5, chunk.Z>>5
 	chunkX, chunkZ := chunk.X&0x1F, chunk.Z&0x1F
@@ -178,4 +185,8 @@ search:
 	// File length is fixed on the next write.
 
 	return err
+}
+
+type ChunkHolder struct {
+	Level chunk.Chunk
 }

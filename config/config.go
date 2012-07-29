@@ -36,7 +36,7 @@ func (c *Configuration) Save() {
 func init() {
 	// Defaults
 	Config.NumSlots = 10
-	Config.ServerDescription = "StuzzD Private Toaster"
+	Config.ServerDescription = "StuzzHosting is Best Hosting"
 
 	// Read the file
 	f, err := os.Open("stuzzd.conf")

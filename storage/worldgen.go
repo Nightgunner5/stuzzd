@@ -1,13 +1,16 @@
-package networking
+package storage
 
 import (
 	"github.com/Nightgunner5/stuzzd/block"
+	"github.com/Nightgunner5/stuzzd/chunk"
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"github.com/Nightgunner5/stuzzd/util"
 	"math/rand"
 )
 
 func river(in float64) float64 {
+	// This function does some math that was decided upon by "trial and oh look at that, that's cool".
+
 	out := 5 - 50*in*in
 	if out < 0 {
 		return 0
@@ -15,35 +18,35 @@ func river(in float64) float64 {
 	return out
 }
 
-func ChunkGen(chunkX, chunkZ int32) *Chunk {
-	chunk := new(Chunk)
-
-	chunk.X, chunk.Z = chunkX, chunkZ
+func ChunkGen(chunkX, chunkZ int32) *chunk.Chunk {
+	chunk := &chunk.Chunk{X: chunkX, Z: chunkZ}
 
 	r := rand.New(rand.NewSource(int64(uint32(chunkX))<<32 | int64(uint32(chunkZ))))
 
-	for x := uint8(0); x < 16; x++ {
-		for z := uint8(0); z < 16; z++ {
+	for x := chunkX << 4; x < (chunkX<<4)+16; x++ {
+		for z := chunkZ << 4; z < (chunkZ<<4)+16; z++ {
 			chunk.SetBlock(x, 0, z, block.Bedrock)
 
-			fx := float64(x)/16 + float64(chunkX)
-			fz := float64(z)/16 + float64(chunkZ)
+			fx := float64(x) / 16
+			fz := float64(z) / 16
 
-			stone := uint8(6 + 4*util.Noise2(fx, fz))
-			land := uint8(58 + 8*util.Noise2(fx/10, fz/10))
+			stone := int32(6 + 4*util.Noise2(fx, fz))
+			land := int32(58 + 8*util.Noise2(fx/10, fz/10))
 
 			mountain := util.Noise3(fx/15, float64(land)/15, fz/15)
+			isMountain := true
 			mountain -= 0.4
 			if mountain < 0 {
 				mountain = 0
+				isMountain = false
 			}
 			mountain *= 30
 
-			land += uint8(mountain)
+			land += int32(mountain)
 
-			river := uint8(river(util.Noise2(fx/4, fz/4)))
+			river := int32(river(util.Noise2(fx/4, fz/4)))
 
-			for y := uint8(1); y < land-stone; y++ {
+			for y := int32(1); y < land-stone; y++ {
 				chunk.SetBlock(x, y, z, block.Stone)
 			}
 
@@ -74,10 +77,14 @@ func ChunkGen(chunkX, chunkZ int32) *Chunk {
 						}
 					} else {
 						chunk.SetBlock(x, land+1, z, block.LongGrass)
-						chunk.SetBlockData(x, land+1, z, 1)
+						chunk.SetData(x, land+1, z, 1)
 					}
 				}
-				chunk.SetBiome(x, z, protocol.Plains)
+				if isMountain {
+					chunk.SetBiome(x, z, protocol.ExtremeHills)
+				} else {
+					chunk.SetBiome(x, z, protocol.Plains)
+				}
 			} else {
 				chunk.SetBiome(x, z, protocol.River)
 			}
@@ -85,11 +92,11 @@ func ChunkGen(chunkX, chunkZ int32) *Chunk {
 			if river != 0 {
 				chunk.SetBlock(x, 50, z, block.Air)
 
-				for y := uint8(51); y < 64 && r.Intn(20) != 0 && chunk.GetBlock(x, y, z) == block.Dirt; y++ {
+				for y := int32(51); y < 64 && r.Intn(20) != 0 && chunk.GetBlock(x, y, z) == block.Dirt; y++ {
 					chunk.SetBlock(x, y, z, block.Stone)
 				}
 
-				for y := uint8(51); y < 64 && r.Intn(4) != 0 && chunk.GetBlock(x, y, z) == block.Stone; y++ {
+				for y := int32(51); y < 64 && r.Intn(4) != 0 && chunk.GetBlock(x, y, z) == block.Stone; y++ {
 					chunk.SetBlock(x, y, z, block.Air)
 				}
 

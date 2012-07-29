@@ -2,6 +2,7 @@ package networking
 
 import (
 	"fmt"
+	"github.com/Nightgunner5/stuzzd/chunk"
 	"github.com/Nightgunner5/stuzzd/config"
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"github.com/Nightgunner5/stuzzd/storage"
@@ -20,7 +21,7 @@ var OnlinePlayerCount uint64
 func HandlePlayer(conn net.Conn) Player {
 	p := new(player)
 	p.id = assignID()
-	p.chunkSet = make(map[uint64]*Chunk)
+	p.chunkSet = make(map[uint64]*chunk.Chunk)
 	p.sendq = make(chan protocol.Packet)
 
 	go func() {
@@ -212,7 +213,7 @@ type player struct {
 	movecounter   uint8
 	lastMoveTick  uint64
 	gameMode      protocol.ServerMode
-	chunkSet      map[uint64]*Chunk
+	chunkSet      map[uint64]*chunk.Chunk
 	spawned       bool
 }
 
@@ -303,10 +304,10 @@ func (p *player) sendWorldData() {
 	go func() {
 		for {
 			for i, chunk := range p.chunkSet {
-				x, z := int32(i>>32), int32(i)
+				x, z := chunk.X, chunk.Z
 				dx, dz := int32(p.x)>>4-x, int32(p.z)>>4-z
 				if dx > 10 || dx < -10 || dz > 10 || dz < -10 {
-					chunk.MarkUnused()
+					storage.ReleaseChunk(x, z)
 					sendChunk(p, x, z, nil)
 					delete(p.chunkSet, i)
 				}
@@ -318,7 +319,7 @@ func (p *player) sendWorldData() {
 					for z := middleZ - i; z < middleZ+i; z++ {
 						id := uint64(uint32(x))<<32 | uint64(uint32(z))
 						if _, ok := p.chunkSet[id]; !ok {
-							p.chunkSet[id] = GetChunk(x, z)
+							p.chunkSet[id] = storage.GetChunk(x, z)
 							sendChunk(p, x, z, p.chunkSet[id])
 							runtime.Gosched()
 						}
@@ -390,7 +391,7 @@ func sendPacket(p Player, conn net.Conn, packet protocol.Packet) {
 			}
 		}
 		for _, chunk := range p.(*player).chunkSet {
-			chunk.MarkUnused()
+			storage.ReleaseChunk(chunk.X, chunk.Z)
 		}
 	}
 	if _, err := conn.Write(packet.Packet()); err != nil {
@@ -398,6 +399,7 @@ func sendPacket(p Player, conn net.Conn, packet protocol.Packet) {
 	}
 }
 
+// Used for ignoring network errors when responding to what could be network errors.
 func safeSendPacket(p Player, conn net.Conn, packet protocol.Packet) {
 	defer func() { recover() }()
 	sendPacket(p, conn, packet)

@@ -3,6 +3,7 @@ package networking
 import (
 	"fmt"
 	"github.com/Nightgunner5/stuzzd/block"
+	"github.com/Nightgunner5/stuzzd/chunk"
 	"github.com/Nightgunner5/stuzzd/config"
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"github.com/Nightgunner5/stuzzd/storage"
@@ -129,21 +130,17 @@ func init() {
 	}()
 }
 
-func sendChunk(p Player, x, z int32, chunk *Chunk) {
+func sendChunk(p Player, x, z int32, chunk *chunk.Chunk) {
 	if chunk == nil {
 		p.SendPacketSync(protocol.ChunkAllocation{X: x, Z: z, Init: false})
 	} else {
 		p.SendPacketSync(protocol.ChunkAllocation{X: x, Z: z, Init: true})
-		p.SendPacketSync(protocol.ChunkData{X: x, Z: z, Payload: chunk.Compressed()})
+		p.SendPacketSync(chunk)
 	}
 }
 
 func SaveAllTheThings() {
 	SendToAll(protocol.Kick{Reason: "Server is shutting down!"})
-	chunkLock.Lock()
-	for _, chunk := range chunks {
-		chunk.Save()
-	}
-	chunkLock.Unlock()
-	time.Sleep(time.Second)
+	storage.SaveAndUnloadAllChunks()
+	time.Sleep(time.Second) // Give the kicks a little time to be recieved so the players get a useful message instead of "connection reset".
 }

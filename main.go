@@ -5,6 +5,7 @@ import (
 	"github.com/Nightgunner5/stuzzd/config"
 	"github.com/Nightgunner5/stuzzd/networking"
 	"github.com/Nightgunner5/stuzzd/protocol"
+	"github.com/Nightgunner5/stuzzd/storage"
 	"log"
 	"net"
 	"os"
@@ -51,7 +52,7 @@ func main() {
 	os.Mkdir("world/region", 0755)
 	os.Mkdir("world/players", 0755)
 
-	go networking.InitSpawnArea()
+	go storage.InitSpawnArea()
 
 	ln, err := net.Listen("tcp", *flagHostPort)
 	if err != nil {
