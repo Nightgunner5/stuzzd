@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"github.com/Nightgunner5/stuzzd/chunk"
+	"log"
 	"runtime"
 	"sync"
 	"time"
@@ -95,7 +96,12 @@ func chunkRecycler() {
 		chunkLock.Unlock()
 
 		for _, chunk := range toSave {
-			go WriteChunk(chunk) // They will save in parallel as long as they are in different regions. If not, they will wait for their turn.
+			go func() {
+				err := WriteChunk(chunk)
+				if err != nil {
+					log.Print(err)
+				}
+			}()
 		}
 	}
 }
@@ -113,7 +119,10 @@ func SaveAndUnloadAllChunks() {
 	for _, chunk := range chunks {
 		wg.Add(1)
 		go func() {
-			WriteChunk(chunk)
+			err := WriteChunk(chunk)
+			if err != nil {
+				log.Print(err)
+			}
 			wg.Done()
 		}()
 	}
