@@ -35,9 +35,9 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	os.Mkdir("world")
-	os.Mkdir("world/region")
-	os.Mkdir("world/players")
+	os.Mkdir("world", 0755)
+	os.Mkdir("world/region", 0755)
+	os.Mkdir("world/players", 0755)
 
 	go networking.InitSpawnArea()
 
