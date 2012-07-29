@@ -35,6 +35,10 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
+	os.Mkdir("world")
+	os.Mkdir("world/region")
+	os.Mkdir("world/players")
+
 	go networking.InitSpawnArea()
 
 	ln, err := net.Listen("tcp", *flagHostPort)

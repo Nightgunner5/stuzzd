@@ -177,7 +177,20 @@ func (c *Chunk) Save() {
 		return
 	}
 
-	// TODO: actually save the chunk
+	chunk := new(storage.Chunk)
+
+	// TODO: Don't save empty sections
+	chunk.Sections = make([]storage.Section, 16)
+	for i, section := range chunk.Sections {
+		section.Y = byte(i)
+		copy(section.Blocks[:], c.blocks[i][:])
+		copy(section.Data[:], c.blockData[i][:])
+		copy(section.SkyLight[:], c.lightSky[i][:])
+		copy(section.BlockLight[:], c.lightBlock[i][:])
+	}
+
+	storage.WriteChunk(chunk)
+
 	c.needsSave = false
 }
 
