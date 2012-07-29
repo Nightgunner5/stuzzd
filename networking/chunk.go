@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/zlib"
 	"encoding/binary"
+	"github.com/Nightgunner5/stuzzd/block"
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"github.com/Nightgunner5/stuzzd/storage"
 	"log"
@@ -12,11 +13,11 @@ import (
 )
 
 type Chunk struct {
-	X, Z int32
-	blocks           protocol.BlockChunk
-	blockData        protocol.NibbleChunk
-	lightBlock       protocol.NibbleChunk
-	lightSky         protocol.NibbleChunk
+	X, Z             int32
+	blocks           block.BlockChunk
+	blockData        block.NibbleChunk
+	lightBlock       block.NibbleChunk
+	lightSky         block.NibbleChunk
 	biomes           [16][16]protocol.Biome
 	dirty            bool
 	needsSave        bool
@@ -26,7 +27,7 @@ type Chunk struct {
 	interruptRecycle <-chan bool
 }
 
-func (c *Chunk) SetBlock(x, y, z uint8, block protocol.BlockType) {
+func (c *Chunk) SetBlock(x, y, z uint8, block block.BlockType) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.blocks.Set(x, y, z, block)
@@ -34,7 +35,7 @@ func (c *Chunk) SetBlock(x, y, z uint8, block protocol.BlockType) {
 	c.needsSave = true
 }
 
-func (c *Chunk) GetBlock(x, y, z uint8) protocol.BlockType {
+func (c *Chunk) GetBlock(x, y, z uint8) block.BlockType {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	return c.blocks.Get(x, y, z)
@@ -78,9 +79,9 @@ func (c *Chunk) InitLighting() {
 			for y := uint8(255); y >= 0 && brightness > 0 && brightness < 16; y-- {
 				c.lightSky.Set(x, y, z, brightness)
 				switch c.blocks.Get(x, y, z) { // Skip the lock
-				case protocol.Air, protocol.Glass:
+				case block.Air, block.Glass, block.GlassPane:
 					// Don't change the brightness
-				case protocol.Water, protocol.StationaryWater:
+				case block.Water, block.StationaryWater:
 					brightness--
 				default:
 					brightness -= 4

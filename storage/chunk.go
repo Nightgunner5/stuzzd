@@ -1,6 +1,9 @@
 package storage
 
-import "github.com/Nightgunner5/stuzzd/protocol"
+import (
+	"github.com/Nightgunner5/stuzzd/block"
+	"github.com/Nightgunner5/stuzzd/protocol"
+)
 
 type ChunkHolder struct {
 	Level Chunk
@@ -24,11 +27,11 @@ type Chunk struct {
 type Section struct {
 	Y byte
 
-	Blocks protocol.BlockSection
-	Data   protocol.NibbleSection
+	Blocks block.BlockSection
+	Data   block.NibbleSection
 
-	SkyLight   protocol.NibbleSection
-	BlockLight protocol.NibbleSection
+	SkyLight   block.NibbleSection
+	BlockLight block.NibbleSection
 }
 
 type Entity map[string]interface{}

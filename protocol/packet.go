@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/Nightgunner5/stuzzd/block"
 	"io"
 	"strings"
 )
@@ -588,7 +589,7 @@ type BlockChange struct {
 	X     int32
 	Y     uint8
 	Z     int32
-	Block BlockType
+	Block block.BlockType
 	Data  uint8
 }
 

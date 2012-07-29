@@ -2,6 +2,7 @@ package networking
 
 import (
 	"fmt"
+	"github.com/Nightgunner5/stuzzd/block"
 	"github.com/Nightgunner5/stuzzd/config"
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"github.com/Nightgunner5/stuzzd/storage"
@@ -94,8 +95,8 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 			}
 			fallthrough
 		case 2:
-			if GetBlockAt(pkt.X, int32(pkt.Y), pkt.Z) != protocol.Bedrock {
-				PlayerSetBlockAt(pkt.X, int32(pkt.Y), pkt.Z, protocol.Air, 0)
+			if GetBlockAt(pkt.X, int32(pkt.Y), pkt.Z) != block.Bedrock {
+				PlayerSetBlockAt(pkt.X, int32(pkt.Y), pkt.Z, block.Air, 0)
 			}
 		}
 		// TODO: validation

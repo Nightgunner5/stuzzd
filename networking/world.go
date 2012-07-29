@@ -1,6 +1,7 @@
 package networking
 
 import (
+	"github.com/Nightgunner5/stuzzd/block"
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"github.com/Nightgunner5/stuzzd/storage"
 	"log"
@@ -17,9 +18,9 @@ func unmarkChunkDelayed(chunk *Chunk) {
 	}()
 }
 
-func GetBlockAt(x, y, z int32) protocol.BlockType {
+func GetBlockAt(x, y, z int32) block.BlockType {
 	if y < 0 || y > 255 {
-		return protocol.Air
+		return block.Air
 	}
 	chunk := GetChunkContaining(x, z)
 	defer unmarkChunkDelayed(chunk)
@@ -35,7 +36,7 @@ func GetBlockDataAt(x, y, z int32) uint8 {
 	return chunk.GetBlockData(uint8(x&0xF), uint8(y), uint8(z&0xF))
 }
 
-func PlayerSetBlockAt(x, y, z int32, block protocol.BlockType, data uint8) {
+func PlayerSetBlockAt(x, y, z int32, block block.BlockType, data uint8) {
 	if y < 0 || y > 255 {
 		return
 	}
@@ -47,7 +48,7 @@ func PlayerSetBlockAt(x, y, z int32, block protocol.BlockType, data uint8) {
 	SendToAll(protocol.BlockChange{X: x, Y: uint8(y), Z: z, Block: block, Data: data})
 }
 
-func SetBlockAt(x, y, z int32, block protocol.BlockType, data uint8) {
+func SetBlockAt(x, y, z int32, block block.BlockType, data uint8) {
 	if y < 0 || y > 255 {
 		return
 	}
@@ -59,7 +60,7 @@ func SetBlockAt(x, y, z int32, block protocol.BlockType, data uint8) {
 	queueBlockSend(x, y, z)
 }
 
-func setBlockNoUpdate(x, y, z int32, block protocol.BlockType, data uint8) {
+func setBlockNoUpdate(x, y, z int32, block block.BlockType, data uint8) {
 	if y < 0 || y > 255 {
 		return
 	}
@@ -75,10 +76,12 @@ func startBlockUpdate(x, y, z int32) {
 			for Z := z - 1; Z <= z+1; Z++ {
 				chunk := GetChunkContaining(X, Z)
 				switch chunk.GetBlock(uint8(X&0xF), uint8(Y), uint8(Z&0xF)) {
-				case protocol.Water, protocol.StationaryWater:
-					chunk.SetBlock(uint8(X&0xF), uint8(Y), uint8(Z&0xF), protocol.Water)
+				case block.Water, block.StationaryWater:
+					chunk.SetBlock(uint8(X&0xF), uint8(Y), uint8(Z&0xF), block.Water)
 					queueUpdate(X, Y, Z)
-				case protocol.Sponge, protocol.Gravel, protocol.Sand, protocol.LongGrass, protocol.RedFlower, protocol.YellowFlower:
+				case block.Sponge:
+					queueUpdate(X, Y, Z)
+				case block.Gravel, block.Sand, block.LongGrass, block.RedFlower, block.YellowFlower:
 					queueUpdate(X, Y, Z)
 				}
 				chunk.MarkUnused()
@@ -89,33 +92,33 @@ func startBlockUpdate(x, y, z int32) {
 
 func incrementWater(x, y, z int32) {
 	level := GetBlockDataAt(x, y, z)
-	if block := GetBlockAt(x, y, z); block != protocol.Water && block != protocol.StationaryWater { // No water here yet
-		SetBlockAt(x, y, z, protocol.Water, 0x7)
+	if b := GetBlockAt(x, y, z); b != block.Water && b != block.StationaryWater { // No water here yet
+		SetBlockAt(x, y, z, block.Water, 0x7)
 		return
 	}
 	if level&0x7 == 0x0 { // Already full
 		return
 	}
-	SetBlockAt(x, y, z, protocol.Water, level&0x8|(level&0x7-1)&0x7)
+	SetBlockAt(x, y, z, block.Water, level&0x8|(level&0x7-1)&0x7)
 }
 func decrementWater(x, y, z int32) {
 	level := GetBlockDataAt(x, y, z)
-	if block := GetBlockAt(x, y, z); block != protocol.Water && block != protocol.StationaryWater { // No water here
+	if b := GetBlockAt(x, y, z); b != block.Water && b != block.StationaryWater { // No water here
 		return
 	}
 	if level&0x7 == 0x7 { // No water left
-		SetBlockAt(x, y, z, protocol.Air, 0)
+		SetBlockAt(x, y, z, block.Air, 0)
 		return
 	}
-	SetBlockAt(x, y, z, protocol.Water, level&0x8|(level&0x7+1)&0x7)
+	SetBlockAt(x, y, z, block.Water, level&0x8|(level&0x7+1)&0x7)
 }
 
 func getWaterLevel(x, y, z int32) uint8 {
-	block := GetBlockAt(x, y, z)
-	if block == protocol.Water || block == protocol.StationaryWater {
+	b := GetBlockAt(x, y, z)
+	if b == block.Water || b == block.StationaryWater {
 		return 8 - (GetBlockDataAt(x, y, z) & 0x7)
 	}
-	if block.Passable() {
+	if b.Passable() {
 		return 0
 	}
 	return ^uint8(0)
@@ -239,9 +242,12 @@ func queueBlockSend(x, y, z int32) {
 	blockSendQueue[chunk][struct{ x, y, z uint8 }{uint8(x & 0xF), uint8(y), uint8(z & 0xF)}] = true
 }
 
+var updateLock sync.Mutex
 var updateQueue = make(map[struct{ x, y, z int32 }]bool)
 
 func queueUpdate(x, y, z int32) {
+	updateLock.Lock()
+	defer updateLock.Unlock()
 	updateQueue[struct{ x, y, z int32 }{x, y, z}] = true
 }
 
@@ -249,35 +255,46 @@ func ticker() {
 	for {
 		time.Sleep(50 * time.Millisecond)
 
+		updateLock.Lock()
+
+		queue := updateQueue
+		updateQueue = make(map[struct{ x, y, z int32 }]bool)
+
+		updateLock.Unlock()
+
 		updateCount := 0
 
-		for block, _ := range updateQueue {
-			x, y, z := block.x, block.y, block.z
+		for loc, _ := range queue {
+			x, y, z := loc.x, loc.y, loc.z
 			blockType := GetBlockAt(x, y, z)
 			switch blockType {
-			case protocol.Water:
-				if !spreadWater(x, y, z) && GetBlockAt(x, y, z) == protocol.Water {
-					setBlockNoUpdate(x, y, z, protocol.StationaryWater, GetBlockDataAt(x, y, z))
+			case block.Water:
+				if !spreadWater(x, y, z) && GetBlockAt(x, y, z) == block.Water {
+					setBlockNoUpdate(x, y, z, block.StationaryWater, GetBlockDataAt(x, y, z))
 				}
-			case protocol.Sand, protocol.Gravel, protocol.LongGrass, protocol.RedFlower, protocol.YellowFlower:
+			case block.Sand, block.Gravel, block.LongGrass, block.RedFlower, block.YellowFlower:
 				if GetBlockAt(x, y-1, z).Passable() {
 					blockData := GetBlockDataAt(x, y, z)
 					SetBlockAt(x, y, z, GetBlockAt(x, y-1, z), GetBlockDataAt(x, y-1, z))
 					SetBlockAt(x, y-1, z, blockType, blockData)
 				}
-			case protocol.Sponge:
+			case block.Sponge:
 				switch GetBlockAt(x, y+1, z) {
-				case protocol.Water, protocol.StationaryWater:
+				case block.Water, block.StationaryWater:
 					decrementWater(x, y+1, z)
 				}
 			}
 			updateCount++
-			delete(updateQueue, block)
+			delete(queue, loc)
 			runtime.Gosched() // Don't cause too much lag
 			if updateCount >= 10000 {
 				log.Print("> 10000 updates. Waiting for the next tick to resume updating.")
 				break
 			}
+		}
+
+		for loc, _ := range queue {
+			queueUpdate(loc.x, loc.y, loc.z)
 		}
 
 		for chunk, blocks := range blockSendQueue {
