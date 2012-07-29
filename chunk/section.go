@@ -19,20 +19,22 @@ func (s *SectionList) Swap(a, b int) {
 	(*s)[a], (*s)[b] = (*s)[b], (*s)[a]
 }
 
-// Determines if a section exists in O(log n) time.
-func (s *SectionList) Has(y byte) bool {
-	i := sort.Search(len(*s), func(i int) bool {
+func (s *SectionList) index(y byte) int {
+	return sort.Search(len(*s), func(i int) bool {
 		return (*s)[i].Y >= y
 	})
+}
+
+// Determines if a section exists in O(log n) time.
+func (s *SectionList) Has(y byte) bool {
+	i := s.index(y)
 	return i < len(*s) && (*s)[i].Y == y
 }
 
 // Get the section with a given Y, creating it if it is not already in the list.
 // The caller must handle synchronization.
 func (s *SectionList) Get(y byte) *Section {
-	i := sort.Search(len(*s), func(i int) bool {
-		return (*s)[i].Y >= y
-	})
+	i := s.index(y)
 	if i < len(*s) && (*s)[i].Y == y {
 		return (*s)[i]
 	}
@@ -45,9 +47,7 @@ func (s *SectionList) Get(y byte) *Section {
 
 // Removes the section at the given Y coordinate if it has no non-air blocks.
 func (s *SectionList) Compact(y byte) {
-	i := sort.Search(len(*s), func(i int) bool {
-		return (*s)[i].Y >= y
-	})
+	i := s.index(y)
 	if i >= len(*s) || (*s)[i].Y != y {
 		return
 	}

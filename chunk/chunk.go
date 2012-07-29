@@ -81,7 +81,11 @@ func (c *Chunk) SetBlock(x, y, z int32, blockType block.BlockType) {
 	}
 
 	if y >= c.HeightMap[(z&0xF)<<4|(x&0xF)] {
-		c.recalculateHeight(x, z)
+		if blockType == block.Air {
+			c.recalculateHeight(x, z)
+		} else {
+			c.HeightMap[(z&0xF)<<4|(x&0xF)] = y
+		}
 	}
 
 	c.dirty()
