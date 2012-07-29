@@ -9,4 +9,4 @@ git pull
 
 # Build and start the server.
 go build -v && \
-GOMAXPROCS=1 ./stuzzd -cpuprofile cpu-$BASHPID.prof -memprofile mem-$BASHPID.prof
+GOMAXPROCS=4 ./stuzzd -cpuprofile cpu-$BASHPID.prof -memprofile mem-$BASHPID.prof

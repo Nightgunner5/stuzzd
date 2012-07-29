@@ -32,6 +32,20 @@ func main() {
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
+	if *flagMemProfile != "" {
+		go func() {
+			for {
+				time.Sleep(10 * time.Second)
+
+				f, err := os.Create(*flagMemProfile)
+				if err != nil {
+					log.Print(err)
+				}
+				pprof.WriteHeapProfile(f)
+			}
+		}()
+
+	}
 
 	os.Mkdir("world", 0755)
 	os.Mkdir("world/region", 0755)
@@ -65,15 +79,6 @@ func main() {
 		if *flagCPUProfile != "" {
 			log.Print("Finishing up profile information...")
 			pprof.StopCPUProfile()
-		}
-		if *flagMemProfile != "" {
-			log.Print("Writing memory profile...")
-			f, err := os.Create(*flagMemProfile)
-			if err != nil {
-				log.Fatal(err)
-			}
-			pprof.WriteHeapProfile(f)
-
 		}
 		os.Exit(0)
 	}()
