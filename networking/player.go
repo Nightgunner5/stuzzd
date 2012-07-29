@@ -259,7 +259,7 @@ func (p *player) SendPosition(x, y, z float64) {
 		panic("fell out of world")
 	}
 	blockX, blockY, blockZ := int32(math.Floor(x)), int32(math.Floor(y)), int32(math.Floor(z))
-	if block := GetBlockAt(blockX, blockY, blockZ); !block.Passable() {
+	if block := GetBlockAt(blockX, blockY, blockZ); !block.Passable() && !block.SemiPassable() {
 		panic("inside a block")
 	}
 
