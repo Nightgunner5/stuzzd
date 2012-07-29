@@ -185,12 +185,12 @@ func (c *Chunk) Save() {
 
 	// TODO: Don't save empty sections
 	chunk.Sections = make([]storage.Section, 16)
-	for i, section := range chunk.Sections {
-		section.Y = byte(i)
-		copy(section.Blocks[:], c.blocks[i][:])
-		copy(section.Data[:], c.blockData[i][:])
-		copy(section.SkyLight[:], c.lightSky[i][:])
-		copy(section.BlockLight[:], c.lightBlock[i][:])
+	for i := range chunk.Sections {
+		chunk.Sections[i].Y = byte(i)
+		copy(chunk.Sections[i].Blocks[:], c.blocks[i][:])
+		copy(chunk.Sections[i].Data[:], c.blockData[i][:])
+		copy(chunk.Sections[i].SkyLight[:], c.lightSky[i][:])
+		copy(chunk.Sections[i].BlockLight[:], c.lightBlock[i][:])
 	}
 
 	err := storage.WriteChunk(chunk)
