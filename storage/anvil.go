@@ -69,7 +69,7 @@ func ReadChunk(chunkX, chunkZ int32) (*chunk.Chunk, error) {
 
 	err = nbt.Unmarshal(compression, bytes.NewReader(buf), &chunk)
 
-	return &chunk.Level, err
+	return chunk.Level, err
 }
 
 func WriteChunk(chunk *chunk.Chunk) error {
@@ -139,7 +139,7 @@ func WriteChunk(chunk *chunk.Chunk) error {
 	}
 
 	var buf bytes.Buffer
-	err = nbt.Marshal(nbt.ZLib, &buf, ChunkHolder{*chunk})
+	err = nbt.Marshal(nbt.ZLib, &buf, ChunkHolder{chunk})
 	if err != nil {
 		return err
 	}
@@ -188,5 +188,5 @@ search:
 }
 
 type ChunkHolder struct {
-	Level chunk.Chunk
+	Level *chunk.Chunk
 }
