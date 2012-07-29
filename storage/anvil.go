@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-var locks map[uint64]*sync.RWMutex
+var locks = make(map[uint64]*sync.RWMutex)
 var lockLock sync.Mutex
 func getLock(chunkX, chunkZ int32) *sync.RWMutex {
 	lockLock.Lock()
