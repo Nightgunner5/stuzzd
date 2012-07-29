@@ -1,7 +1,3 @@
 language: go
 script: go test github.com/Nightgunner5/stuzzd/... -v -bench .
-notifications:
-  irc:
-    channels:
-      - "irc.rizon.net#stuzzhosting"
 
