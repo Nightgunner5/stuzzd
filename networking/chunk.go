@@ -12,6 +12,7 @@ import (
 )
 
 type Chunk struct {
+	X, Z int32
 	blocks           protocol.BlockChunk
 	blockData        protocol.NibbleChunk
 	lightBlock       protocol.NibbleChunk
@@ -180,6 +181,8 @@ func (c *Chunk) Save() {
 
 	chunk := new(storage.Chunk)
 
+	chunk.X, chunk.Z = c.X, c.Z
+
 	// TODO: Don't save empty sections
 	chunk.Sections = make([]storage.Section, 16)
 	for i, section := range chunk.Sections {
@@ -199,6 +202,7 @@ func (c *Chunk) Save() {
 }
 
 func (c *Chunk) decode(stored *storage.Chunk) {
+	c.X, c.Z = stored.X, stored.Z
 	for _, section := range stored.Sections {
 		copy(c.blocks[section.Y][:], section.Blocks[:])
 		copy(c.blockData[section.Y][:], section.Data[:])

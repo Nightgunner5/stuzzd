@@ -92,8 +92,10 @@ func WriteChunk(chunk *Chunk) error {
 	size := fstat.Size()
 	if size%4096 != 0 {
 		needed := 4096 - (size % 4096)
+		f.Seek(0, os.SEEK_END)
 		f.Write(make([]byte, needed))
 		size += needed
+		f.Seek(0, os.SEEK_SET)
 	}
 
 	sectors := make([]bool, size>>12)
@@ -107,6 +109,9 @@ func WriteChunk(chunk *Chunk) error {
 		for i := 0; i < 1024; i++ {
 			var location uint32
 			binary.Read(f, binary.BigEndian, &location)
+			if location == 0 {
+				continue
+			}
 
 			firstSector := location >> 8
 			numSectors := location & 0xFF

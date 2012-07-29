@@ -379,10 +379,14 @@ func sendPacket(p Player, conn net.Conn, packet protocol.Packet) {
 		if !strings.Contains(kick.Reason, "§") {
 			if strings.HasPrefix(kick.Reason, "Error: ") {
 				log.Print("Dropping ", conn.RemoteAddr(), " ", p.Username(), " - ", kick.Reason)
-				SendToAll(protocol.Chat{Message: fmt.Sprintf("%s is error %s", formatUsername(p), strings.ToLower(kick.Reason)[7:])})
+				if p.Username() != "" {
+					SendToAll(protocol.Chat{Message: fmt.Sprintf("%s is error %s", formatUsername(p), strings.ToLower(kick.Reason)[7:])})
+				}
 			} else {
 				log.Print("Kicking ", conn.RemoteAddr(), " ", p.Username(), " - ", kick.Reason)
-				SendToAll(protocol.Chat{Message: fmt.Sprintf("%s was kicked: %s", formatUsername(p), kick.Reason)})
+				if p.Username() != "" {
+					SendToAll(protocol.Chat{Message: fmt.Sprintf("%s was kicked: %s", formatUsername(p), kick.Reason)})
+				}
 			}
 		}
 		for _, chunk := range p.(*player).chunkSet {

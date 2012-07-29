@@ -17,6 +17,8 @@ func river(in float64) float64 {
 func ChunkGen(chunkX, chunkZ int32) *Chunk {
 	chunk := new(Chunk)
 
+	chunk.X, chunk.Z = chunkX, chunkZ
+
 	r := rand.New(rand.NewSource(int64(uint32(chunkX))<<32 | int64(uint32(chunkZ))))
 
 	for x := uint8(0); x < 16; x++ {
