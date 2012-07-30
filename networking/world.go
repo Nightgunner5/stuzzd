@@ -90,15 +90,21 @@ func startBlockUpdate(x, y, z int32) {
 		for Y := y - 1; Y <= y+1; Y++ {
 			for Z := z - 1; Z <= z+1; Z++ {
 				chunk := storage.GetChunkContaining(X, Z)
+
 				switch chunk.GetBlock(X, Y, Z) {
 				case block.Water, block.StationaryWater:
+					stopTheFloodingOMG := chunk.GetData(X, Y, Z)
 					chunk.SetBlock(X, Y, Z, block.Water)
+					chunk.SetData(X, Y, Z, stopTheFloodingOMG)
 					queueUpdate(X, Y, Z)
+
 				case block.Sponge:
 					queueUpdate(X, Y, Z)
+
 				case block.Gravel, block.Sand, block.LongGrass, block.RedFlower, block.YellowFlower:
 					queueUpdate(X, Y, Z)
 				}
+
 				storage.ReleaseChunkContaining(X, Z)
 			}
 		}
@@ -106,21 +112,21 @@ func startBlockUpdate(x, y, z int32) {
 }
 
 func incrementWater(x, y, z int32) {
-	level := GetBlockDataAt(x, y, z)
 	if b := GetBlockAt(x, y, z); b != block.Water && b != block.StationaryWater { // No water here yet
 		SetBlockAt(x, y, z, block.Water, 0x7)
 		return
 	}
+	level := GetBlockDataAt(x, y, z)
 	if level&0x7 == 0x0 { // Already full
 		return
 	}
 	SetBlockAt(x, y, z, block.Water, level&0x8|(level&0x7-1)&0x7)
 }
 func decrementWater(x, y, z int32) {
-	level := GetBlockDataAt(x, y, z)
 	if b := GetBlockAt(x, y, z); b != block.Water && b != block.StationaryWater { // No water here
 		return
 	}
+	level := GetBlockDataAt(x, y, z)
 	if level&0x7 == 0x7 { // No water left
 		SetBlockAt(x, y, z, block.Air, 0)
 		return
