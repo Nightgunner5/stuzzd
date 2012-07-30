@@ -25,7 +25,7 @@ const TICK = time.Second / 20
 func main() {
 	flag.Parse()
 
-	logFile := os.OpenFile("server.log", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+	logFile, _ := os.OpenFile("server.log", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	log.SetOutput(io.MultiWriter(os.Stdout, logFile))
 
 	if *flagCPUProfile != "" {
