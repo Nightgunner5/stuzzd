@@ -616,6 +616,28 @@ func (p BlockChange) Packet() []byte {
 
 // No read function as this is not sent by the client.
 
+type GameStateType byte
+
+const (
+	InvalidBed     GameStateType = 0
+	StartRaining   GameStateType = 1
+	StopRaining    GameStateType = 2
+	ChangeGameMode GameStateType = 3
+	DisplayCredits GameStateType = 4
+)
+
+// Change Game State (0x46)
+type ChangeGameState struct {
+	Type GameStateType
+	Mode ServerMode
+}
+
+func (p ChangeGameState) Packet() []byte {
+	return []byte{0x46, byte(p.Type), byte(p.Mode)}
+}
+
+// No read function as this is not sent by the client.
+
 // Player List Item (0xC9)
 type PlayerListItem struct {
 	Name   string

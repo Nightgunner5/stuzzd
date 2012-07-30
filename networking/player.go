@@ -384,6 +384,7 @@ func (p *_player) SetGameMode(mode protocol.ServerMode) {
 		p.stored.Abilities.Flying = false
 	}
 	p.SendPacketSync(&p.stored.Abilities)
+	p.SendPacketSync(protocol.ChangeGameState{Type: protocol.ChangeGameMode, Mode: mode})
 }
 
 func (p *_player) makeSpawnPacket() protocol.SpawnNamedEntity {
@@ -416,7 +417,7 @@ func (p *_player) sendSpawnPacket() {
 
 func sendPacket(p Player, conn net.Conn, packet protocol.Packet) {
 	if kick, ok := packet.(protocol.Kick); ok {
-		if p.Authenticated() {
+		if p.Username() != "" {
 			if strings.HasPrefix(kick.Reason, "Error: ") {
 				log.Print("Dropping ", conn.RemoteAddr(), " ", p.Username(), " - ", kick.Reason)
 				SendToAll(protocol.Chat{Message: fmt.Sprintf("%s is error %s", formatUsername(p), strings.ToLower(kick.Reason)[7:])})
