@@ -30,15 +30,17 @@ func loadPlayer(name string) *Player {
 
 	f, err := os.Open("world/players/" + name + ".dat")
 	if err != nil {
+		player.name = name
 		player.defaults()
 		return player
 	}
 	defer f.Close()
 
-	err = nbt.Unmarshal(nbt.GZip, f, &player)
+	err = nbt.Unmarshal(nbt.GZip, f, player)
 	if err != nil {
 		panic(err)
 	}
+	player.name = name
 	return player
 }
 
@@ -80,6 +82,8 @@ type Player struct {
 
 	Inventory  []InventoryItem
 	EnderItems []InventoryItem
+
+	name string `nbt:"-"`
 }
 
 type PlayerAbilities struct {
@@ -107,6 +111,14 @@ func (p *Player) defaults() {
 	p.Rotation = []float32{0, 0}
 }
 
-func (p *Player) Save() {
-	// MASSIVE TODO
+func (p *Player) Save() error {
+	f, err := os.Create("world/players/" + p.name + ".dat")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	err = nbt.Marshal(nbt.GZip, f, p)
+
+	return err
 }

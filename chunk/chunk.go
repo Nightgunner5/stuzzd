@@ -218,6 +218,8 @@ func (c *Chunk) processLighting() {
 					switch section.Blocks.Get(x, y, z) {
 					case block.Air:
 						// No change
+					case block.Leaves:
+						light -= byte(y & 1)
 					case block.Water, block.StationaryWater:
 						light -= 2
 					default:
