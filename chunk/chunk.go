@@ -2,11 +2,14 @@ package chunk
 
 import (
 	"bytes"
+	"code.google.com/p/go-uuid/uuid"
 	"compress/zlib"
 	"encoding/binary"
 	"fmt"
 	"github.com/Nightgunner5/stuzzd/block"
 	"github.com/Nightgunner5/stuzzd/protocol"
+	"hash/adler32"
+	"io"
 	"reflect"
 	"sync"
 )
@@ -303,7 +306,74 @@ func (c *Chunk) Packet() []byte {
 	return c.packet
 }
 
+func (c *Chunk) SpawnEntity(e Entity) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if _, ok := e["uuid"]; !ok {
+		e["uuid"] = uuid.New()
+	}
+
+	c.Entities = append(c.Entities, e)
+
+	c.NeedsSave = true
+}
+
+func (c *Chunk) DespawnEntity(e Entity) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	for i, ent := range c.Entities {
+		if ent["uuid"].(string) == e["uuid"].(string) {
+			if i == 0 {
+				c.Entities = c.Entities[1:]
+			} else if i == len(c.Entities)-1 {
+				c.Entities = c.Entities[:len(c.Entities)-1]
+			} else {
+				c.Entities = append(c.Entities[:i-1], c.Entities[i+1:]...)
+			}
+			c.NeedsSave = true
+			return
+		}
+	}
+}
+
+func (c *Chunk) EntitySpawnPacket() protocol.BakedPacket {
+	var buf bytes.Buffer
+
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	for _, ent := range c.Entities {
+		ent.SpawnPacket(&buf)
+	}
+
+	return protocol.BakedPacket(buf.Bytes())
+}
+
 type Entity map[string]interface{}
+
+func (e Entity) ID() int32 {
+	if eid, ok := e["EID"]; ok {
+		return eid.(int32)
+	}
+	e["EID"] = int32(adler32.Checksum([]byte(e["uuid"].(string))) & 0x7FFFFFFF)
+	return e["EID"].(int32)
+}
+
+func (e Entity) Type() string {
+	return e["id"].(string)
+}
+
+func (e Entity) SpawnPacket(w io.Writer) {
+	switch e.Type() {
+	case "Item":
+		e.ItemDrop().SpawnPacket(w)
+	default:
+		panic("Unhandled entity type: " + e.Type())
+	}
+}
+
 type TileEntity map[string]interface{}
 
 type TileTick struct {

@@ -461,3 +461,13 @@ func SendToAllExcept(exclude Player, packet protocol.Packet) {
 		}
 	}
 }
+
+func SendToAllNearChunk(chunkX, chunkZ int32, packet protocol.Packet) {
+	id := uint64(uint32(chunkX))<<32 | uint64(uint32(chunkZ))
+	baked := protocol.BakePacket(packet)
+	for _, player := range players {
+		if _, ok := player.(*_player).chunkSet[id]; ok {
+			go player.SendPacketSync(baked)
+		}
+	}
+}

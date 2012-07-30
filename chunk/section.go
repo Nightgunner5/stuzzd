@@ -20,9 +20,13 @@ func (s *SectionList) Swap(a, b int) {
 }
 
 func (s *SectionList) index(y byte) int {
-	return sort.Search(len(*s), func(i int) bool {
-		return (*s)[i].Y >= y
-	})
+	// Since the section list holds at most 16 items, the overhead from a binary search isn't worth it in most cases.
+	for i := 0; i < len(*s); i++ {
+		if (*s)[i].Y >= y {
+			return i
+		}
+	}
+	return len(*s)
 }
 
 // Determines if a section exists in O(log n) time.

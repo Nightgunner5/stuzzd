@@ -72,8 +72,9 @@ func (abilities *PlayerAbilities) Packet() []byte {
 }
 
 type InventoryItem struct {
-	Type   uint16 `nbt:"id"`
-	Damage uint16
-	Count  uint8
-	Slot   uint8
+	Type   int16 `nbt:"id"`
+	Damage int16
+	Count  int8
+	Slot   int8
+	Meta   map[string]interface{} `nbt:"tag"`
 }

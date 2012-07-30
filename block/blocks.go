@@ -154,3 +154,11 @@ func (b BlockType) SemiPassable() bool {
 	}
 	return false
 }
+
+func (b BlockType) ItemDrop() int16 {
+	switch b {
+	case Grass:
+		return int16(Dirt)
+	}
+	return int16(b)
+}

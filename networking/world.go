@@ -1,7 +1,10 @@
 package networking
 
 import (
+	"bytes"
 	"github.com/Nightgunner5/stuzzd/block"
+	"github.com/Nightgunner5/stuzzd/chunk"
+	"github.com/Nightgunner5/stuzzd/player"
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"github.com/Nightgunner5/stuzzd/storage"
 	"log"
@@ -56,6 +59,18 @@ func SetBlockAt(x, y, z int32, block block.BlockType, data uint8) {
 
 	startBlockUpdate(x, y, z)
 	queueBlockSend(x, y, z)
+}
+
+func DropItem(x, y, z float64, itemType int16, data uint8) {
+	c := storage.GetChunkContaining(int32(x), int32(z))
+	defer storage.ReleaseChunkContaining(int32(x), int32(z))
+
+	ent := chunk.NewItemDrop(x, y, z, &player.InventoryItem{Type: itemType, Damage: int16(data), Count: 1})
+	c.SpawnEntity(chunk.Entity(ent))
+
+	var buf bytes.Buffer
+	ent.SpawnPacket(&buf)
+	SendToAllNearChunk(c.X, c.Z, protocol.BakedPacket(buf.Bytes()))
 }
 
 func setBlockNoUpdate(x, y, z int32, block block.BlockType, data uint8) {

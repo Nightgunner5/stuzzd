@@ -92,12 +92,20 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 	case protocol.PlayerDigging:
 		switch pkt.Status {
 		case 0:
-			if !p.(*_player).stored.Abilities.InstaBuild {
-				break
+			if p.(*_player).stored.Abilities.InstaBuild {
+				if GetBlockAt(pkt.X, int32(pkt.Y), pkt.Z) != block.Bedrock {
+					PlayerSetBlockAt(pkt.X, int32(pkt.Y), pkt.Z, block.Air, 0)
+				}
 			}
-			fallthrough
 		case 2:
-			if GetBlockAt(pkt.X, int32(pkt.Y), pkt.Z) != block.Bedrock {
+			blockType := GetBlockAt(pkt.X, int32(pkt.Y), pkt.Z)
+			if blockType != block.Bedrock {
+				item := blockType.ItemDrop()
+
+				if item != 0 {
+					DropItem(float64(pkt.X)+0.5, float64(pkt.Y)+0.5, float64(pkt.Z)+0.5, item, GetBlockDataAt(pkt.X, int32(pkt.Y), pkt.Z))
+				}
+
 				PlayerSetBlockAt(pkt.X, int32(pkt.Y), pkt.Z, block.Air, 0)
 			}
 		}
@@ -137,6 +145,7 @@ func sendChunk(p Player, x, z int32, chunk *chunk.Chunk) {
 	} else {
 		p.SendPacketSync(protocol.ChunkAllocation{X: x, Z: z, Init: true})
 		p.SendPacketSync(chunk)
+		p.SendPacketSync(chunk.EntitySpawnPacket())
 	}
 }
 
