@@ -1,22 +1,23 @@
 package networking
 
 import (
+	"bytes"
 	"github.com/Nightgunner5/stuzzd/protocol"
+	"io"
 	"sync"
 )
 
 type Entity interface {
-	ID() uint32
-}
-
-type entity struct {
-	id uint32
+	ID() int32
+	SpawnPacket(io.Writer)
+	Position() (x, y, z float64)
+	SetPosition(x, y, z float64)
 }
 
 var idMutex sync.Mutex
-var nextID uint32
+var nextID int32
 
-func assignID() uint32 {
+func assignID() int32 {
 	idMutex.Lock()
 	defer idMutex.Unlock()
 
@@ -24,12 +25,8 @@ func assignID() uint32 {
 	return nextID
 }
 
-func (e *entity) ID() uint32 {
-	return e.id
-}
-
-var entities = make(map[uint32]Entity)
-var players = make(map[uint32]Player)
+var entities = make(map[int32]Entity)
+var players = make(map[int32]Player)
 
 func RegisterEntity(ent Entity) {
 	entities[ent.ID()] = ent
@@ -44,4 +41,10 @@ func RemoveEntity(ent Entity) {
 		delete(players, ent.ID())
 	}
 	SendToAll(protocol.DestroyEntity{ID: ent.ID()})
+}
+
+func EntitySpawnPacket(ent Entity) protocol.Packet {
+	var buf bytes.Buffer
+	ent.SpawnPacket(&buf)
+	return protocol.BakedPacket(buf.Bytes())
 }

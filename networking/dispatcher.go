@@ -1,6 +1,7 @@
 package networking
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/Nightgunner5/stuzzd/block"
 	"github.com/Nightgunner5/stuzzd/chunk"
@@ -57,13 +58,14 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 			} else {
 				SendToAll(protocol.Chat{Message: fmt.Sprintf("%s connected.", formatUsername(p))})
 			}
+			var otherPlayers bytes.Buffer
 			for _, player := range players {
 				if player.Authenticated() && player != p {
-					// Spawn them for the new guy
-					p.SendPacketSync(player.makeSpawnPacket())
+					player.SpawnPacket(&otherPlayers)
 				}
 			}
-			SendToAllExcept(p, p.makeSpawnPacket())
+			p.SendPacketSync(protocol.BakedPacket(otherPlayers.Bytes()))
+			SendToAllExcept(p, EntitySpawnPacket(p))
 		} else {
 			p.SendPacketSync(protocol.Kick{Reason: "Failed to verify username!"})
 		}

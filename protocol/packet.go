@@ -109,9 +109,6 @@ func ReadKeepAlive(in io.Reader) KeepAlive {
 	return p
 }
 
-// http://wiki.vg/Protocol#Login_Request_.280x01.29
-const PROTOCOL_VERSION uint32 = 29
-
 type ServerMode int32
 
 const (
@@ -140,7 +137,7 @@ const (
 // Sent by client after the handshake to finish logging in.
 // Sent by server if the client is accepted, otherwise kick is sent.
 type LoginRequest struct {
-	EntityID   uint32     // Version on client->server
+	EntityID   int32      // Version on client->server
 	Username   string     // Not used on server->client
 	LevelType  string     // Not used in client->server, "default" in server->client
 	ServerMode ServerMode // Not used in client->server
@@ -401,7 +398,7 @@ func ReadPlayerDigging(in io.Reader) PlayerDigging {
 
 // Animation (0x12)
 type Animation struct {
-	EID       uint32
+	EID       int32
 	Animation uint8
 }
 
@@ -422,11 +419,11 @@ func ReadAnimation(in io.Reader) Animation {
 
 // Spawn Named Entity (0x14)
 type SpawnNamedEntity struct {
-	EID        uint32
+	EID        int32
 	Name       string
 	X, Y, Z    float64
 	Yaw, Pitch float32
-	ItemInHand uint16
+	ItemInHand int16
 }
 
 func (p SpawnNamedEntity) Packet() []byte {
@@ -447,7 +444,7 @@ func (p SpawnNamedEntity) Packet() []byte {
 
 // Destroy Entity (0x1D)
 type DestroyEntity struct {
-	ID uint32
+	ID int32
 }
 
 func (p DestroyEntity) Packet() []byte {
@@ -461,7 +458,7 @@ func (p DestroyEntity) Packet() []byte {
 
 // Entity Relative Move (0x1F)
 type EntityRelativeMove struct {
-	ID      uint32
+	ID      int32
 	X, Y, Z int8 // Encoded at creation time, not write time, to prevent incorrect kicks.
 }
 
@@ -479,7 +476,7 @@ func (p EntityRelativeMove) Packet() []byte {
 
 // Entity Look (0x20)
 type EntityLook struct {
-	ID         uint32
+	ID         int32
 	Yaw, Pitch float32
 }
 
@@ -496,7 +493,7 @@ func (p EntityLook) Packet() []byte {
 
 // Entity Teleport (0x22)
 type EntityTeleport struct {
-	ID         uint32
+	ID         int32
 	X, Y, Z    float64
 	Yaw, Pitch float32
 }
@@ -517,7 +514,7 @@ func (p EntityTeleport) Packet() []byte {
 
 // Entity Head Look (0x23)
 type EntityHeadLook struct {
-	ID  uint32
+	ID  int32
 	Yaw float32
 }
 

@@ -179,8 +179,6 @@ type Player interface {
 
 	Authenticated() bool
 
-	Position() (x, y, z float64)
-	SetPosition(x, y, z float64)
 	// Sets the position and sends the offset to all online players.
 	SendPosition(x, y, z float64)
 	ForcePosition()
@@ -192,14 +190,13 @@ type Player interface {
 
 	SetGameMode(protocol.ServerMode)
 
-	makeSpawnPacket() protocol.SpawnNamedEntity
 	sendWorldData()
 	setUsername(string)
 	getLoginToken() uint64
 }
 
 type _player struct {
-	entity
+	id            int32
 	stored        *player.Player
 	username      string
 	logintoken    uint64
@@ -210,6 +207,10 @@ type _player struct {
 	gameMode      protocol.ServerMode
 	chunkSet      map[uint64]*chunk.Chunk
 	spawned       bool
+}
+
+func (p *_player) ID() int32 {
+	return p.id
 }
 
 func (p *_player) setUsername(username string) {
@@ -387,10 +388,10 @@ func (p *_player) SetGameMode(mode protocol.ServerMode) {
 	p.SendPacketSync(protocol.ChangeGameState{Type: protocol.ChangeGameMode, Mode: mode})
 }
 
-func (p *_player) makeSpawnPacket() protocol.SpawnNamedEntity {
+func (p *_player) SpawnPacket(w io.Writer) {
 	x, y, z := p.Position()
 	yaw, pitch := p.Angles()
-	return protocol.SpawnNamedEntity{
+	w.Write(protocol.SpawnNamedEntity{
 		EID:   p.id,
 		Name:  p.username,
 		X:     x,
@@ -398,7 +399,7 @@ func (p *_player) makeSpawnPacket() protocol.SpawnNamedEntity {
 		Z:     z,
 		Yaw:   yaw,
 		Pitch: pitch,
-	}
+	}.Packet())
 }
 
 func (p *_player) sendSpawnPacket() {
