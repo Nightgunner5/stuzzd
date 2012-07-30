@@ -9,6 +9,7 @@ import (
 	"github.com/Nightgunner5/stuzzd/storage"
 	"log"
 	"runtime"
+	"sort"
 	"sync"
 	"time"
 )
@@ -138,109 +139,71 @@ func getWaterLevel(x, y, z int32) uint8 {
 	return ^uint8(0)
 }
 
+type waterLevel struct {
+	x, y, z int32
+	level   uint8
+}
+type waterLevels []waterLevel
+
+func (w waterLevels) Len() int {
+	return len(w)
+}
+func (w waterLevels) Less(a, b int) bool {
+	return w[a].level < w[b].level
+}
+func (w waterLevels) Swap(a, b int) {
+	w[a], w[b] = w[b], w[a]
+}
+
+func getWaterLevels(x, y, z int32) waterLevels {
+	levels := make(waterLevels, 0)
+	for Y := y - 1; Y <= y; Y++ {
+		for X := x - 1; X <= x+1; X++ {
+			for Z := z - 1; Z <= z+1; Z++ {
+				if x == X && y == Y && z == Z {
+					continue
+				}
+				level := getWaterLevel(X, Y, Z)
+				if level < 8 {
+					levels = append(levels, waterLevel{
+						x: X, y: Y, z: Z,
+						level: level,
+					})
+				}
+			}
+		}
+
+		if len(levels) != 0 {
+			break
+		}
+	}
+	sort.Sort(levels)
+	return levels
+}
+
 func spreadWater(x, y, z int32) bool {
 	here := getWaterLevel(x, y, z)
-	xneg := getWaterLevel(x-1, y, z)
-	xpos := getWaterLevel(x+1, y, z)
-	zneg := getWaterLevel(x, y, z-1)
-	zpos := getWaterLevel(x, y, z+1)
-	down := getWaterLevel(x, y-1, z)
+	levels := getWaterLevels(x, y, z)
 
 	if here == 0 || here > 8 { // No water here
 		return false
 	}
 
 	change := false
-	for i := 0; i < 8 && here > 0; i++ {
-		if down < 8 {
-			down++
-			incrementWater(x, y-1, z)
-			here--
-			decrementWater(x, y, z)
-			change = true
-			continue
-		}
-		if xpos < here-1 && xpos <= xneg && xpos <= zpos && xpos <= zneg {
-			xpos++
-			incrementWater(x+1, y, z)
-			here--
-			decrementWater(x, y, z)
-			change = true
-			continue
-		}
-		if xneg < here-1 && xneg <= xpos && xneg <= zpos && xneg <= zneg {
-			xneg++
-			incrementWater(x-1, y, z)
-			here--
-			decrementWater(x, y, z)
-			change = true
-			continue
-		}
-		if zpos < here-1 && zpos <= xpos && zpos <= xneg && zpos <= zneg {
-			zpos++
-			incrementWater(x, y, z+1)
-			here--
-			decrementWater(x, y, z)
-			change = true
-			continue
-		}
-		if zneg < here-1 && zneg <= xpos && zneg <= xneg && zneg <= zpos {
-			zneg++
-			incrementWater(x, y, z-1)
-			here--
-			decrementWater(x, y, z)
-			change = true
-			continue
+	for i := 0; i < 3 && here > 0; i++ {
+		if len(levels) == 0 || levels[0].level >= 8 {
+			break
 		}
 
-		if xneg < xpos-1 && xneg < 8 && xpos > 0 && xpos <= 8 {
-			xneg++
-			incrementWater(x-1, y, z)
-			xpos--
-			decrementWater(x+1, y, z)
-			change = true
-			continue
-		}
-		if xpos < xneg-1 && xpos < 8 && xneg > 0 && xneg <= 8 {
-			xpos++
-			incrementWater(x+1, y, z)
-			xneg--
-			decrementWater(x-1, y, z)
-			change = true
-			continue
-		}
-		if zneg < zpos-1 && zneg < 8 && zpos > 0 && zpos <= 8 {
-			zneg++
-			incrementWater(x, y, z-1)
-			zpos--
-			decrementWater(x, y, z+1)
-			change = true
-			continue
-		}
-		if zpos < zneg-1 && zpos < 8 && zneg > 0 && zneg <= 8 {
-			zpos++
-			incrementWater(x, y, z+1)
-			zneg--
-			decrementWater(x, y, z-1)
-			change = true
-			continue
-		}
-		break
-	}
-	// Get rid of the tiny bit of water that stays there forever
-	if here == 1 {
-		if getWaterLevel(x-1, y-1, z) < 8 {
-			incrementWater(x-1, y-1, z)
+		if levels[0].level < here-1 || levels[0].y < y {
+			here--
 			decrementWater(x, y, z)
-		} else if getWaterLevel(x+1, y-1, z) < 8 {
-			incrementWater(x+1, y-1, z)
-			decrementWater(x, y, z)
-		} else if getWaterLevel(x, y-1, z-1) < 8 {
-			incrementWater(x, y-1, z-1)
-			decrementWater(x, y, z)
-		} else if getWaterLevel(x, y-1, z+1) < 8 {
-			incrementWater(x, y-1, z+1)
-			decrementWater(x, y, z)
+			levels[0].level++
+			incrementWater(levels[0].x, levels[0].y, levels[0].z)
+			sort.Sort(levels)
+			change = true
+		} else {
+			break
 		}
 	}
 	return change
