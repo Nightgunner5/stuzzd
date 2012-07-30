@@ -306,7 +306,7 @@ func ticker() {
 			c := storage.GetChunk(chunk.x, chunk.z)
 			packet := protocol.MultiBlockChange{X: chunk.x, Z: chunk.z, Blocks: make([]uint32, 0, len(blocks))}
 			for block, _ := range blocks {
-				packet.Blocks = append(packet.Blocks, uint32(block.x)<<28|uint32(block.z)<<24|uint32(block.y)<<16|uint32(c.GetBlock(block.x, block.y, block.z))<<4|uint32(c.GetData(block.x, block.y, block.z)))
+				packet.Blocks = append(packet.Blocks, uint32(block.x&0xF)<<28|uint32(block.z&0xF)<<24|uint32(block.y)<<16|uint32(c.GetBlock(block.x, block.y, block.z))<<4|uint32(c.GetData(block.x, block.y, block.z)))
 			}
 			storage.ReleaseChunk(chunk.x, chunk.z)
 			SendToAll(packet)
