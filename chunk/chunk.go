@@ -74,6 +74,8 @@ func (c *Chunk) SetBlock(x, y, z int32, blockType block.BlockType) {
 		return
 	}
 
+	section.Data.Set(x, y, z, 0)
+
 	section.Blocks.Set(x, y, z, blockType)
 
 	if blockType == block.Air {

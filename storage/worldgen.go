@@ -18,6 +18,32 @@ func river(in float64) float64 {
 	return out
 }
 
+func growTree(chunk *chunk.Chunk, r *rand.Rand, x, y, z int32) {
+	if x&0xF == x && z&0xF == z {
+		return
+	}
+	if x&0xF < 2 || x&0xF > 13 || z&0xF < 2 || z&0xF > 13 {
+		return
+	}
+
+	chunk.SetBlock(x, y-1, z, block.Dirt)
+
+	height := r.Int31n(5) + 3
+	for Y := y; Y < y+height; Y++ {
+		chunk.SetBlock(x, Y, z, block.Log)
+	}
+
+	for X := x - 2; X <= x+2; X++ {
+		for Z := z - 2; Z <= z+2; Z++ {
+			for Y := y + height - 2; Y <= y+height+2; Y++ {
+				if chunk.GetBlock(X, Y, Z) == block.Air {
+					chunk.SetBlock(X, Y, Z, block.Leaves)
+				}
+			}
+		}
+	}
+}
+
 func ChunkGen(chunkX, chunkZ int32) *chunk.Chunk {
 	chunk := &chunk.Chunk{X: chunkX, Z: chunkZ}
 
@@ -46,12 +72,9 @@ func ChunkGen(chunkX, chunkZ int32) *chunk.Chunk {
 
 			river := int32(river(util.Noise2(fx/4, fz/4)))
 
-			smooth := util.Noise2(fx/50, fz/50)
-			smooth *= smooth
+			smooth := util.Noise2(fx/50, fz/50) * 3
 
-			rough := int32(util.Noise2(fx*2, fz*2) * smooth * 2)
-
-			land += rough
+			rough := util.Noise2(fx*2, fz*2) * 2
 
 			for y := int32(1); y < land-stone; y++ {
 				chunk.SetBlock(x, y, z, block.Stone)
@@ -73,7 +96,7 @@ func ChunkGen(chunkX, chunkZ int32) *chunk.Chunk {
 
 			if river == 0 || land > 50 {
 				chunk.SetBlock(x, land, z, block.Grass)
-				if r.Intn(3) == 0 {
+				if smooth < rough {
 					if r.Intn(8) == 0 {
 						fy := float64(land + 1)
 						if util.Noise3(fx/10, fy/2, fz/10) > 0 {
@@ -85,6 +108,9 @@ func ChunkGen(chunkX, chunkZ int32) *chunk.Chunk {
 						chunk.SetBlock(x, land+1, z, block.LongGrass)
 						chunk.SetData(x, land+1, z, 1)
 					}
+				}
+				if smooth < rough / 5 && mountain > 1 && r.Intn(20) == 0 {
+					growTree(chunk, r, x, land+1, z)
 				}
 				if isMountain {
 					chunk.SetBiome(x, z, protocol.ExtremeHills)
