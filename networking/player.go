@@ -323,14 +323,14 @@ func (p *_player) sendWorldData() {
 			for i, chunk := range p.chunkSet {
 				x, z := chunk.X, chunk.Z
 				dx, dz := (int32(p.stored.Position[0])>>4)-x, (int32(p.stored.Position[2])>>4)-z
-				if dx > 15 || dx < -15 || dz > 15 || dz < -15 {
+				if dx > 10 || dx < -10 || dz > 10 || dz < -10 {
 					storage.ReleaseChunk(x, z)
 					sendChunk(p, x, z, nil)
 					delete(p.chunkSet, i)
 				}
 			}
 
-			for i := int32(1); i <= 13; i++ {
+			for i := int32(1); i <= 8; i++ {
 				middleX, middleZ := int32(p.stored.Position[0]/16), int32(p.stored.Position[2]/16)
 				for x := middleX - i; x < middleX+i; x++ {
 					for z := middleZ - i; z < middleZ+i; z++ {
