@@ -80,7 +80,7 @@ func init() {
 
 func chunkRecycler() {
 	for {
-		time.Sleep(2 * time.Minute)
+		time.Sleep(15 * time.Second)
 
 		chunkLock.Lock()
 		toSave := make([]*chunk.Chunk, 0, len(chunks))
