@@ -46,6 +46,13 @@ func ChunkGen(chunkX, chunkZ int32) *chunk.Chunk {
 
 			river := int32(river(util.Noise2(fx/4, fz/4)))
 
+			smooth := util.Noise2(fx/50, fz/50)
+			smooth *= smooth
+
+			rough := int32(util.Noise2(fx*2, fz*2) * smooth * 2)
+
+			land += rough
+
 			for y := int32(1); y < land-stone; y++ {
 				chunk.SetBlock(x, y, z, block.Stone)
 			}
@@ -54,7 +61,6 @@ func ChunkGen(chunkX, chunkZ int32) *chunk.Chunk {
 				chunk.SetBlock(x, y, z, block.Dirt)
 			}
 
-			// Begin river
 			if river != 0 {
 				chunk.SetBlock(x, 46-river, z, block.Gravel)
 				chunk.SetBlock(x, 47-river, z, block.Gravel)
@@ -70,7 +76,7 @@ func ChunkGen(chunkX, chunkZ int32) *chunk.Chunk {
 				if r.Intn(3) == 0 {
 					if r.Intn(8) == 0 {
 						fy := float64(land + 1)
-						if util.Noise3(fx/2, fy/2, fz/2) > 0 {
+						if util.Noise3(fx/10, fy/2, fz/10) > 0 {
 							chunk.SetBlock(x, land+1, z, block.RedFlower)
 						} else {
 							chunk.SetBlock(x, land+1, z, block.YellowFlower)
@@ -101,7 +107,6 @@ func ChunkGen(chunkX, chunkZ int32) *chunk.Chunk {
 				}
 
 			}
-			// End river
 		}
 	}
 	chunk.InitLighting()

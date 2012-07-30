@@ -19,10 +19,12 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 		return
 	case protocol.LoginRequest:
 		if pkt.EntityID != protocol.PROTOCOL_VERSION {
-			panic("Your minecraft version isn't the one I expected.")
+			p.SendPacketSync(protocol.Kick{Reason: "Your minecraft version isn't the one I expected."})
+			return
 		}
 		if pkt.Username != p.Username() {
-			panic(fmt.Sprint("Your username doesn't match the one you told me earlier. (", pkt.Username, " != ", p.Username(), ")"))
+			p.SendPacketSync(protocol.Kick{Reason: fmt.Sprint("Your username doesn't match the one you told me earlier. (", pkt.Username, " != ", p.Username(), ")")})
+			return
 		}
 		req, _ := http.Get(fmt.Sprintf("http://session.minecraft.net/game/checkserver.jsp?user=%s&serverId=%x", p.Username(), p.getLoginToken()))
 		buf := make([]byte, 3)
