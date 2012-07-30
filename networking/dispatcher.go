@@ -152,5 +152,6 @@ func sendChunk(p Player, x, z int32, chunk *chunk.Chunk) {
 func SaveAllTheThings() {
 	SendToAll(protocol.Kick{Reason: "Server is shutting down!"})
 	storage.SaveAndUnloadAllChunks()
+	storage.SaveAllPlayers()
 	time.Sleep(time.Second) // Give the kicks a little time to be recieved so the players get a useful message instead of "connection reset".
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/Nightgunner5/stuzzd/networking"
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"github.com/Nightgunner5/stuzzd/storage"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -23,6 +24,9 @@ const TICK = time.Second / 20
 
 func main() {
 	flag.Parse()
+
+	logFile := os.OpenFile("server.log", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+	log.SetOutput(io.MultiWriter(os.Stdout, logFile))
 
 	if *flagCPUProfile != "" {
 		log.Print("Profiling to file ", *flagCPUProfile, " started.")

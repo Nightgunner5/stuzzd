@@ -3,6 +3,7 @@ package storage
 import (
 	"github.com/Nightgunner5/go.nbt"
 	"github.com/Nightgunner5/stuzzd/player"
+	"log"
 	"os"
 	"sync"
 )
@@ -48,6 +49,13 @@ func loadPlayer(name string) *player.Player {
 }
 
 func SavePlayer(name string, player *player.Player) error {
+	playerLock.Lock()
+	defer playerLock.Unlock()
+
+	return savePlayer(name, player)
+}
+
+func savePlayer(name string, player *player.Player) error {
 	f, err := os.Create("world/players/" + name + ".dat")
 	if err != nil {
 		return err
@@ -57,4 +65,22 @@ func SavePlayer(name string, player *player.Player) error {
 	err = nbt.Marshal(nbt.GZip, f, player)
 
 	return err
+}
+
+func SaveAllPlayers() {
+	playerLock.Lock()
+	defer playerLock.Unlock()
+
+	var wg sync.WaitGroup
+	for name, player := range players {
+		wg.Add(1)
+		go func() {
+			err := savePlayer(name, player)
+			if err != nil {
+				log.Print(err)
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
 }
