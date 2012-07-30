@@ -37,7 +37,7 @@ func HandlePlayer(conn net.Conn) Player {
 			}
 			RemoveEntity(p)
 			if p.authenticated {
-				storage.SavePlayer(p.Username(), p.stored)
+				storage.SaveAndUnloadPlayer(p.Username(), p.stored)
 				OnlinePlayerCount--
 			}
 			time.Sleep(1 * time.Second)

@@ -55,6 +55,16 @@ func SavePlayer(name string, player *player.Player) error {
 	return savePlayer(name, player)
 }
 
+func SaveAndUnloadPlayer(name string, player *player.Player) error {
+	playerLock.Lock()
+	defer playerLock.Unlock()
+
+	err := savePlayer(name, player)
+	delete(players, name)
+
+	return err
+}
+
 func savePlayer(name string, player *player.Player) error {
 	f, err := os.Create("world/players/" + name + ".dat")
 	if err != nil {

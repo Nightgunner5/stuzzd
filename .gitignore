@@ -19,9 +19,11 @@ _cgo_export.*
 
 _testmain.go
 
+# StuzzD
 *.exe
 stuzzd
 *.prof
 ops.txt
 world/
 stuzzd.conf
+server.log
