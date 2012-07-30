@@ -30,27 +30,26 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 		buf := make([]byte, 3)
 		req.Body.Read(buf)
 		if string(buf) == "YES" {
-			p.(*player).authenticated = true
+			p.(*_player).authenticated = true
 			if OnlinePlayerCount >= config.Config.NumSlots {
 				p.SendPacketSync(protocol.Kick{Reason: "Server is full!"})
 				return
 			}
 			OnlinePlayerCount++
-			p.(*player).gameMode = protocol.Survival
-			if isNetworkAdmin(p) {
-				p.(*player).gameMode = protocol.Creative
-			}
 			p.SendPacketSync(protocol.LoginRequest{
 				EntityID:   p.ID(),
 				LevelType:  "default",
-				ServerMode: p.(*player).gameMode,
+				ServerMode: protocol.Survival,
 				Dimension:  protocol.Overworld,
 				Difficulty: protocol.Peaceful,
 				MaxPlayers: uint8(config.Config.NumSlots), // If you have more than 255 slots, I applaud you.
 			})
-			stored := storage.GetPlayer(p.Username())
-			p.SetPosition(stored.Position[0], stored.Position[1], stored.Position[2])
-			p.SetAngles(stored.Rotation[0], stored.Rotation[1])
+			p.(*_player).stored = storage.GetPlayer(p.Username())
+			if p.(*_player).stored.Abilities.InstaBuild {
+				p.SetGameMode(protocol.Creative)
+			} else {
+				p.SetGameMode(protocol.Survival)
+			}
 			p.sendWorldData()
 			log.Print(p.Username(), " connected.")
 			if customLoginMessage(p) != "" {
@@ -93,7 +92,7 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 	case protocol.PlayerDigging:
 		switch pkt.Status {
 		case 0:
-			if p.(*player).gameMode != protocol.Creative {
+			if !p.(*_player).stored.Abilities.InstaBuild {
 				break
 			}
 			fallthrough
@@ -108,7 +107,7 @@ func dispatchPacket(p Player, packet protocol.Packet) {
 			SendToAllExcept(p, pkt)
 		}
 	case protocol.PlayerAbilities:
-		// TODO
+		p.(*_player).stored.Abilities.Flying = p.(*_player).stored.Abilities.MayFly && pkt.Flying
 	case protocol.ServerListPing:
 		p.SendPacketSync(protocol.Kick{Reason: fmt.Sprintf("%s§%d§%d", config.Config.ServerDescription, OnlinePlayerCount, config.Config.NumSlots)})
 	case protocol.Kick:

@@ -80,6 +80,16 @@ func encodeAngle(a float32, out io.Writer) {
 	out.Write([]byte{uint8(a / 180 * 128)})
 }
 
+type BakedPacket []byte
+
+func (p BakedPacket) Packet() []byte {
+	return []byte(p)
+}
+
+func BakePacket(p Packet) BakedPacket {
+	return BakedPacket(p.Packet())
+}
+
 // Keep Alive (0x00)
 // Server must send every 1000 ticks with a nonzero ID. Client must send with ID 0.
 type KeepAlive struct {

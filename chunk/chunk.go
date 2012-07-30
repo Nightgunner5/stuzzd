@@ -34,6 +34,13 @@ type Chunk struct {
 	packet        []byte       `nbt:"-"`
 }
 
+func (c *Chunk) GetHighestBlockYAt(x, z int32) int32 {
+	if x>>4 != c.X || z>>4 != c.Z {
+		panic(fmt.Sprintf("GetHighestBlockYAt() called on chunk %d, %d but should have been called on chunk %d, %d!", c.X, c.Z, x>>4, z>>4))
+	}
+	return c.HeightMap[(z&0xF)<<4|(x&0xF)]
+}
+
 func (c *Chunk) GetBlock(x, y, z int32) block.BlockType {
 	if y < 0 || y > MAX_HEIGHT {
 		return block.Air

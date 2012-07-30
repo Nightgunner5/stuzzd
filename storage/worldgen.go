@@ -109,7 +109,7 @@ func ChunkGen(chunkX, chunkZ int32) *chunk.Chunk {
 						chunk.SetData(x, land+1, z, 1)
 					}
 				}
-				if smooth < rough / 5 && mountain > 1 && r.Intn(20) == 0 {
+				if smooth < rough/5 && mountain > 1 && r.Intn(20) == 0 {
 					growTree(chunk, r, x, land+1, z)
 				}
 				if isMountain {

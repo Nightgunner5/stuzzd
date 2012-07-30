@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/Nightgunner5/stuzzd/chunk"
 	"github.com/Nightgunner5/stuzzd/config"
+	"github.com/Nightgunner5/stuzzd/player"
 	"github.com/Nightgunner5/stuzzd/protocol"
 	"github.com/Nightgunner5/stuzzd/storage"
 	"io"
@@ -19,7 +20,7 @@ import (
 var OnlinePlayerCount uint64
 
 func HandlePlayer(conn net.Conn) Player {
-	p := new(player)
+	p := new(_player)
 	p.id = assignID()
 	p.chunkSet = make(map[uint64]*chunk.Chunk)
 	p.sendq = make(chan protocol.Packet)
@@ -36,12 +37,7 @@ func HandlePlayer(conn net.Conn) Player {
 			}
 			RemoveEntity(p)
 			if p.authenticated {
-				stored := storage.GetPlayer(p.Username())
-				x, y, z := p.Position()
-				stored.Position = []float64{x, y, z}
-				yaw, pitch := p.Angles()
-				stored.Rotation = []float32{yaw, pitch}
-				stored.Save()
+				storage.SavePlayer(p.Username(), p.stored)
 				OnlinePlayerCount--
 			}
 			time.Sleep(1 * time.Second)
@@ -202,14 +198,13 @@ type Player interface {
 	getLoginToken() uint64
 }
 
-type player struct {
+type _player struct {
 	entity
+	stored        *player.Player
 	username      string
 	logintoken    uint64
 	authenticated bool
 	sendq         chan protocol.Packet
-	x, y, z       float64
-	pitch, yaw    float32
 	movecounter   uint8
 	lastMoveTick  uint64
 	gameMode      protocol.ServerMode
@@ -217,32 +212,28 @@ type player struct {
 	spawned       bool
 }
 
-func (p *player) setUsername(username string) {
+func (p *_player) setUsername(username string) {
 	p.username = username
 	p.logintoken = uint64(rand.Int63())
 }
 
-func (p *player) Username() string {
+func (p *_player) Username() string {
 	return p.username
 }
 
-func (p *player) getLoginToken() uint64 {
+func (p *_player) getLoginToken() uint64 {
 	return p.logintoken
 }
 
-//func (p *player) SendPacket(packet protocol.Packet) {
-//	go p.SendPacketSync(packet)
-//}
-
-func (p *player) SendPacketSync(packet protocol.Packet) {
+func (p *_player) SendPacketSync(packet protocol.Packet) {
 	p.sendq <- packet
 }
 
-func (p *player) Authenticated() bool {
+func (p *_player) Authenticated() bool {
 	return p.authenticated
 }
 
-func (p *player) SendPosition(x, y, z float64) {
+func (p *_player) SendPosition(x, y, z float64) {
 	if !p.spawned {
 		return
 	}
@@ -255,57 +246,83 @@ func (p *player) SendPosition(x, y, z float64) {
 			p.ForcePosition()
 		}
 	}()
+
+	px, py, pz := p.Position()
+
 	if y < 0 {
-		p.y = 128
+		if py < 1 {
+			p.SetPosition(px, 128, pz)
+		}
 		panic("fell out of world")
 	}
+
 	blockX, blockY, blockZ := int32(math.Floor(x)), int32(math.Floor(y)), int32(math.Floor(z))
 	if block := GetBlockAt(blockX, blockY, blockZ); !block.Passable() && !block.SemiPassable() {
 		panic("inside a block")
 	}
 
-	p.movecounter++
-	if p.movecounter < 10 {
-		SendToAllExcept(p, protocol.EntityRelativeMove{
-			ID: p.id,
-			X:  protocol.CheckedFloatToByte(x - p.x),
-			Y:  protocol.CheckedFloatToByte(y - p.y),
-			Z:  protocol.CheckedFloatToByte(z - p.z),
-		})
+	distance := math.Sqrt((x-px)*(x-px) + (y-py)*(y-py) + (z-pz)*(z-pz))
+	noFallY := y
+	if noFallY < py {
+		noFallY = py
+	}
+	distanceNoFall := math.Sqrt((x-px)*(x-px) + (noFallY-py)*(noFallY-py) + (z-pz)*(z-pz))
+	if distance > 10 || distanceNoFall > 5 {
+		panic("Moved too fast")
 	}
 
-	p.x, p.y, p.z = x, y, z
+	p.SetPosition(x, y, z)
 
-	if p.movecounter >= 10 {
-		SendToAllExcept(p, protocol.EntityTeleport{
+	p.movecounter++
+	if p.movecounter < 10 && distance < 4 {
+		SendToAllExcept(p, protocol.EntityRelativeMove{
 			ID: p.id,
-			X:  p.x,
-			Y:  p.y, Z: p.z,
-			Yaw: p.yaw, Pitch: p.pitch,
+			X:  protocol.CheckedFloatToByte(x - px),
+			Y:  protocol.CheckedFloatToByte(y - py),
+			Z:  protocol.CheckedFloatToByte(z - pz),
+		})
+	} else {
+		yaw, pitch := p.Angles()
+		SendToAllExcept(p, protocol.EntityTeleport{
+			ID:    p.id,
+			X:     x,
+			Y:     y,
+			Z:     z,
+			Yaw:   yaw,
+			Pitch: pitch,
 		})
 		p.movecounter = 0
 	}
 }
 
-func (p *player) ForcePosition() {
+func (p *_player) ForcePosition() {
+	x, y, z := p.Position()
+	yaw, pitch := p.Angles()
 	SendToAllExcept(p, protocol.EntityTeleport{
 		ID:    p.id,
-		X:     p.x,
-		Y:     p.y,
-		Z:     p.z,
-		Yaw:   p.yaw,
-		Pitch: p.pitch,
+		X:     x,
+		Y:     y,
+		Z:     z,
+		Yaw:   yaw,
+		Pitch: pitch,
 	})
-	p.SendPacketSync(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 1.2, Y2: p.y + 0.2, Z: p.z, Yaw: p.yaw, Pitch: p.pitch})
+	p.SendPacketSync(protocol.PlayerPositionLook{
+		X:     x,
+		Y1:    y + 1.2,
+		Y2:    y + 0.2,
+		Z:     z,
+		Yaw:   yaw,
+		Pitch: pitch,
+	})
 
 }
 
-func (p *player) sendWorldData() {
+func (p *_player) sendWorldData() {
 	go func() {
 		for {
 			for i, chunk := range p.chunkSet {
 				x, z := chunk.X, chunk.Z
-				dx, dz := int32(p.x)>>4-x, int32(p.z)>>4-z
+				dx, dz := int32(p.stored.Position[0])>>4-x, int32(p.stored.Position[2])>>4-z
 				if dx > 10 || dx < -10 || dz > 10 || dz < -10 {
 					storage.ReleaseChunk(x, z)
 					sendChunk(p, x, z, nil)
@@ -314,7 +331,7 @@ func (p *player) sendWorldData() {
 			}
 
 			for i := int32(1); i <= 8; i++ {
-				middleX, middleZ := int32(p.x/16), int32(p.z/16)
+				middleX, middleZ := int32(p.stored.Position[0]/16), int32(p.stored.Position[2]/16)
 				for x := middleX - i; x < middleX+i; x++ {
 					for z := middleZ - i; z < middleZ+i; z++ {
 						id := uint64(uint32(x))<<32 | uint64(uint32(z))
@@ -336,61 +353,79 @@ func (p *player) sendWorldData() {
 	}()
 }
 
-func (p *player) SetPosition(x, y, z float64) {
-	p.x, p.y, p.z = x, y, z
+func (p *_player) SetPosition(x, y, z float64) {
+	p.stored.Position[0], p.stored.Position[1], p.stored.Position[2] = x, y, z
 }
 
-func (p *player) Position() (x, y, z float64) {
-	return p.x, p.y, p.z
+func (p *_player) Position() (x, y, z float64) {
+	return p.stored.Position[0], p.stored.Position[1], p.stored.Position[2]
 }
 
-func (p *player) SendAngles(yaw, pitch float32) {
-	p.yaw, p.pitch = yaw, pitch
+func (p *_player) SendAngles(yaw, pitch float32) {
+	p.SetAngles(yaw, pitch)
 	SendToAllExcept(p, protocol.EntityLook{ID: p.id, Yaw: yaw, Pitch: pitch})
 	SendToAllExcept(p, protocol.EntityHeadLook{ID: p.id, Yaw: yaw})
 }
 
-func (p *player) SetAngles(yaw, pitch float32) {
-	p.yaw, p.pitch = yaw, pitch
+func (p *_player) SetAngles(yaw, pitch float32) {
+	p.stored.Rotation[0], p.stored.Rotation[1] = yaw, pitch
 }
 
-func (p *player) Angles() (yaw, pitch float32) {
-	return p.yaw, p.pitch
+func (p *_player) Angles() (yaw, pitch float32) {
+	return p.stored.Rotation[0], p.stored.Rotation[1]
 }
 
-func (p *player) SetGameMode(mode protocol.ServerMode) {
+func (p *_player) SetGameMode(mode protocol.ServerMode) {
 	p.gameMode = mode
-	p.SendPacketSync(protocol.PlayerAbilities{
-		Invulnerable:   mode == protocol.Creative,
-		CanFly:         mode == protocol.Creative,
-		InstantDestroy: mode == protocol.Creative,
+	p.stored.Abilities.InstaBuild = mode == protocol.Creative
+	p.stored.Abilities.Invulnerable = mode == protocol.Creative
+	p.stored.Abilities.MayFly = mode == protocol.Creative
+	if !p.stored.Abilities.MayFly {
+		p.stored.Abilities.Flying = false
+	}
+	p.SendPacketSync(&p.stored.Abilities)
+}
+
+func (p *_player) makeSpawnPacket() protocol.SpawnNamedEntity {
+	x, y, z := p.Position()
+	yaw, pitch := p.Angles()
+	return protocol.SpawnNamedEntity{
+		EID:   p.id,
+		Name:  p.username,
+		X:     x,
+		Y:     y,
+		Z:     z,
+		Yaw:   yaw,
+		Pitch: pitch,
+	}
+}
+
+func (p *_player) sendSpawnPacket() {
+	x, y, z := p.Position()
+	yaw, pitch := p.Angles()
+	p.SendPacketSync(protocol.PlayerPositionLook{
+		X:      x,
+		Y1:     y + 2,
+		Y2:     y + 3,
+		Z:      z,
+		Ground: false,
+		Yaw:    yaw,
+		Pitch:  pitch,
 	})
-}
-
-func (p *player) makeSpawnPacket() protocol.SpawnNamedEntity {
-	return protocol.SpawnNamedEntity{EID: p.id, Name: p.username, X: p.x, Y: p.y, Z: p.z, Yaw: p.yaw, Pitch: p.pitch}
-}
-
-func (p *player) sendSpawnPacket() {
-	p.SendPacketSync(protocol.PlayerPositionLook{X: p.x, Y1: p.y + 2, Y2: p.y + 3, Z: p.z, Ground: true, Yaw: p.yaw, Pitch: p.pitch})
 }
 
 func sendPacket(p Player, conn net.Conn, packet protocol.Packet) {
 	if kick, ok := packet.(protocol.Kick); ok {
-		if !strings.Contains(kick.Reason, "§") {
+		if p.Authenticated() {
 			if strings.HasPrefix(kick.Reason, "Error: ") {
 				log.Print("Dropping ", conn.RemoteAddr(), " ", p.Username(), " - ", kick.Reason)
-				if p.Username() != "" {
-					SendToAll(protocol.Chat{Message: fmt.Sprintf("%s is error %s", formatUsername(p), strings.ToLower(kick.Reason)[7:])})
-				}
+				SendToAll(protocol.Chat{Message: fmt.Sprintf("%s is error %s", formatUsername(p), strings.ToLower(kick.Reason)[7:])})
 			} else {
 				log.Print("Kicking ", conn.RemoteAddr(), " ", p.Username(), " - ", kick.Reason)
-				if p.Username() != "" {
-					SendToAll(protocol.Chat{Message: fmt.Sprintf("%s was kicked: %s", formatUsername(p), kick.Reason)})
-				}
+				SendToAll(protocol.Chat{Message: fmt.Sprintf("%s was kicked: %s", formatUsername(p), kick.Reason)})
 			}
 		}
-		for _, chunk := range p.(*player).chunkSet {
+		for _, chunk := range p.(*_player).chunkSet {
 			storage.ReleaseChunk(chunk.X, chunk.Z)
 		}
 	}
@@ -406,20 +441,22 @@ func safeSendPacket(p Player, conn net.Conn, packet protocol.Packet) {
 }
 
 func SendToAll(packet protocol.Packet) {
+	baked := protocol.BakePacket(packet)
 	for _, player := range players {
 		if player.Authenticated() {
-			go player.SendPacketSync(packet)
+			go player.SendPacketSync(baked)
 		}
 	}
 }
 
 func SendToAllExcept(exclude Player, packet protocol.Packet) {
+	baked := protocol.BakePacket(packet)
 	for _, player := range players {
 		if player.ID() == exclude.ID() {
 			continue
 		}
 		if player.Authenticated() {
-			go player.SendPacketSync(packet)
+			go player.SendPacketSync(baked)
 		}
 	}
 }
